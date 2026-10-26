@@ -574,14 +574,16 @@ const __outerGlobalRef = (typeof globalThis !== 'undefined' && globalThis) ? glo
   const COLOR_KEYS = ['red', 'yellow', 'blue', 'green', 'purple', 'orange', 'cyan', 'pink'];
 
 
+  // 默认永久启用微缩舞台配置 (zoom: true)，支持 1倍 / 2倍 / 3倍 倒水速度切换
   const userSettings = { sound: true, vibrate: true, music: true, zoom: true };
   let speedLevel = 0;
   let speedPoints = 10;
-  let isSpeed2x = false;
+  let speedMulStage = 1; // 1 | 2 | 3
 
   function getSpeedMultiplier() {
-    const baseMul = 1 + (speedPoints - 10) * 0.08;
-    return isSpeed2x ? baseMul * 1.75 : baseMul;
+    if (speedMulStage === 3) return 2.75;
+    if (speedMulStage === 2) return 1.85;
+    return 1.0;
   }
 
   function triggerHaptic(ms = 12) {
@@ -634,83 +636,83 @@ const __outerGlobalRef = (typeof globalThis !== 'undefined' && globalThis) ? glo
   function playRealisticPourSound(options = {}) {
     if (!userSettings.sound) return;
     try {
-    ensureAudio();
-    if (!audioCtx || typeof audioCtx.createOscillator !== 'function') return;
-    const { maxCap = 4, isGiantCat = false, initialLayers = 0, moveCount = 1, durationMs = 500 } = options;
-    const now = audioCtx.currentTime;
-    const durSec = Math.max(0.22, durationMs / 1000);
-    const noiseBuf = getPinkNoiseBuffer();
-    if (!noiseBuf) return;
+      ensureAudio();
+      if (!audioCtx || typeof audioCtx.createOscillator !== 'function') return;
+      const { maxCap = 4, isGiantCat = false, initialLayers = 0, moveCount = 1, durationMs = 500 } = options;
+      const now = audioCtx.currentTime;
+      const durSec = Math.max(0.22, durationMs / 1000);
+      const noiseBuf = getPinkNoiseBuffer();
+      if (!noiseBuf) return;
 
-    let baseStartFreq = 295, baseMaxFreq = 680, cavityQ = 4.2, glugRateHz = 8.4, streamGainLevel = 0.19;
-    if (isGiantCat) { baseStartFreq = 155; baseMaxFreq = 395; cavityQ = 5.2; glugRateHz = 5.8; streamGainLevel = 0.22; }
-    else if (maxCap <= 2) { baseStartFreq = 510; baseMaxFreq = 980; cavityQ = 3.6; glugRateHz = 11.5; streamGainLevel = 0.16; }
-    else if (maxCap === 6) { baseStartFreq = 220; baseMaxFreq = 540; cavityQ = 4.8; glugRateHz = 7.0; streamGainLevel = 0.21; }
-    else if (maxCap >= 8) { baseStartFreq = 175; baseMaxFreq = 450; cavityQ = 5.5; glugRateHz = 6.0; streamGainLevel = 0.22; }
+      let baseStartFreq = 295, baseMaxFreq = 680, cavityQ = 4.2, glugRateHz = 8.4, streamGainLevel = 0.19;
+      if (isGiantCat) { baseStartFreq = 155; baseMaxFreq = 395; cavityQ = 5.2; glugRateHz = 5.8; streamGainLevel = 0.22; }
+      else if (maxCap <= 2) { baseStartFreq = 510; baseMaxFreq = 980; cavityQ = 3.6; glugRateHz = 11.5; streamGainLevel = 0.16; }
+      else if (maxCap === 6) { baseStartFreq = 220; baseMaxFreq = 540; cavityQ = 4.8; glugRateHz = 7.0; streamGainLevel = 0.21; }
+      else if (maxCap >= 8) { baseStartFreq = 175; baseMaxFreq = 450; cavityQ = 5.5; glugRateHz = 6.0; streamGainLevel = 0.22; }
 
-    const fillStartFrac = Math.min(0.94, initialLayers / maxCap);
-    const fillEndFrac = Math.min(0.98, (initialLayers + moveCount) / maxCap);
-    const freqStart = baseStartFreq + (baseMaxFreq - baseStartFreq) * Math.pow(fillStartFrac, 1.2);
-    const freqEnd = baseStartFreq + (baseMaxFreq - baseStartFreq) * Math.pow(fillEndFrac, 1.2);
+      const fillStartFrac = Math.min(0.94, initialLayers / maxCap);
+      const fillEndFrac = Math.min(0.98, (initialLayers + moveCount) / maxCap);
+      const freqStart = baseStartFreq + (baseMaxFreq - baseStartFreq) * Math.pow(fillStartFrac, 1.2);
+      const freqEnd = baseStartFreq + (baseMaxFreq - baseStartFreq) * Math.pow(fillEndFrac, 1.2);
 
-    const noiseSrc = audioCtx.createBufferSource();
-    noiseSrc.buffer = noiseBuf; noiseSrc.loop = true;
+      const noiseSrc = audioCtx.createBufferSource();
+      noiseSrc.buffer = noiseBuf; noiseSrc.loop = true;
 
-    const cavityFilter = audioCtx.createBiquadFilter();
-    cavityFilter.type = 'bandpass';
-    if (cavityFilter.Q && cavityFilter.Q.setValueAtTime) cavityFilter.Q.setValueAtTime(cavityQ, now); else if (cavityFilter.Q) cavityFilter.Q.value = cavityQ;
-    cavityFilter.frequency.setValueAtTime(freqStart, now);
-    cavityFilter.frequency.exponentialRampToValueAtTime(Math.max(freqStart + 18, freqEnd), now + durSec);
+      const cavityFilter = audioCtx.createBiquadFilter();
+      cavityFilter.type = 'bandpass';
+      if (cavityFilter.Q && cavityFilter.Q.setValueAtTime) cavityFilter.Q.setValueAtTime(cavityQ, now); else if (cavityFilter.Q) cavityFilter.Q.value = cavityQ;
+      cavityFilter.frequency.setValueAtTime(freqStart, now);
+      cavityFilter.frequency.exponentialRampToValueAtTime(Math.max(freqStart + 18, freqEnd), now + durSec);
 
-    const warmthLowpass = audioCtx.createBiquadFilter();
-    warmthLowpass.type = 'lowpass';
-    warmthLowpass.frequency.setValueAtTime(maxCap <= 2 ? 1250 : 920, now);
+      const warmthLowpass = audioCtx.createBiquadFilter();
+      warmthLowpass.type = 'lowpass';
+      warmthLowpass.frequency.setValueAtTime(maxCap <= 2 ? 1250 : 920, now);
 
-    const mainGain = audioCtx.createGain();
-    mainGain.gain.setValueAtTime(0.0005, now);
-    mainGain.gain.linearRampToValueAtTime(streamGainLevel, now + 0.045);
-    mainGain.gain.setValueAtTime(streamGainLevel, now + Math.max(0.06, durSec - 0.06));
-    mainGain.gain.exponentialRampToValueAtTime(0.0005, now + durSec);
+      const mainGain = audioCtx.createGain();
+      mainGain.gain.setValueAtTime(0.0005, now);
+      mainGain.gain.linearRampToValueAtTime(streamGainLevel, now + 0.045);
+      mainGain.gain.setValueAtTime(streamGainLevel, now + Math.max(0.06, durSec - 0.06));
+      mainGain.gain.exponentialRampToValueAtTime(0.0005, now + durSec);
 
-    // 微信小游戏真机 WebAudioContext 的 AudioNode.connect 不支持直接连接 AudioParam (mainGain.gain)，加 try-catch 保护防止中断倒水动画！
-    let lfo = null;
-    try {
-      lfo = audioCtx.createOscillator();
-      const lfoGain = audioCtx.createGain();
-      lfo.type = 'sine';
-      lfo.frequency.setValueAtTime(glugRateHz, now);
-      lfoGain.gain.setValueAtTime(streamGainLevel * 0.15, now);
-      lfo.connect(lfoGain);
-      if (mainGain && mainGain.gain) {
-        lfoGain.connect(mainGain.gain);
-        lfo.start(now);
-        lfo.stop(now + durSec + 0.02);
+      // 微信小游戏真机 WebAudioContext 的 AudioNode.connect 不支持直接连接 AudioParam (mainGain.gain)，加 try-catch 保护防止中断倒水动画！
+      let lfo = null;
+      try {
+        lfo = audioCtx.createOscillator();
+        const lfoGain = audioCtx.createGain();
+        lfo.type = 'sine';
+        lfo.frequency.setValueAtTime(glugRateHz, now);
+        lfoGain.gain.setValueAtTime(streamGainLevel * 0.15, now);
+        lfo.connect(lfoGain);
+        if (mainGain && mainGain.gain) {
+          lfoGain.connect(mainGain.gain);
+          lfo.start(now);
+          lfo.stop(now + durSec + 0.02);
+        }
+      } catch (e) { }
+
+      noiseSrc.connect(cavityFilter); cavityFilter.connect(warmthLowpass); warmthLowpass.connect(mainGain); mainGain.connect(audioCtx.destination);
+      noiseSrc.start(now);
+      noiseSrc.stop(now + durSec + 0.02);
+
+      const dropletCount = Math.floor(6 + moveCount * 2.5);
+      for (let i = 0; i < dropletCount; i++) {
+        const progress = (i + 0.2 + Math.random() * 0.6) / dropletCount;
+        const tDrop = now + 0.02 + progress * (durSec - 0.04);
+        const dropDur = maxCap <= 2 ? 0.032 : 0.042;
+        const curWaterPitch = freqStart + (freqEnd - freqStart) * progress;
+        const bubbleStartF = curWaterPitch * (0.98 + Math.random() * 0.24);
+        const dropOsc = audioCtx.createOscillator();
+        const dropGain = audioCtx.createGain();
+        dropOsc.type = 'sine';
+        dropOsc.frequency.setValueAtTime(bubbleStartF, tDrop);
+        dropOsc.frequency.exponentialRampToValueAtTime(bubbleStartF * 1.3, tDrop + dropDur);
+        const peakG = (isGiantCat ? 0.048 : 0.038) * (0.75 + Math.random() * 0.35);
+        dropGain.gain.setValueAtTime(0.0004, tDrop);
+        dropGain.gain.linearRampToValueAtTime(peakG, tDrop + 0.007);
+        dropGain.gain.exponentialRampToValueAtTime(0.0004, tDrop + dropDur);
+        dropOsc.connect(dropGain); dropGain.connect(audioCtx.destination);
+        dropOsc.start(tDrop); dropOsc.stop(tDrop + dropDur + 0.005);
       }
-    } catch (e) { }
-
-    noiseSrc.connect(cavityFilter); cavityFilter.connect(warmthLowpass); warmthLowpass.connect(mainGain); mainGain.connect(audioCtx.destination);
-    noiseSrc.start(now);
-    noiseSrc.stop(now + durSec + 0.02);
-
-    const dropletCount = Math.floor(6 + moveCount * 2.5);
-    for (let i = 0; i < dropletCount; i++) {
-      const progress = (i + 0.2 + Math.random() * 0.6) / dropletCount;
-      const tDrop = now + 0.02 + progress * (durSec - 0.04);
-      const dropDur = maxCap <= 2 ? 0.032 : 0.042;
-      const curWaterPitch = freqStart + (freqEnd - freqStart) * progress;
-      const bubbleStartF = curWaterPitch * (0.98 + Math.random() * 0.24);
-      const dropOsc = audioCtx.createOscillator();
-      const dropGain = audioCtx.createGain();
-      dropOsc.type = 'sine';
-      dropOsc.frequency.setValueAtTime(bubbleStartF, tDrop);
-      dropOsc.frequency.exponentialRampToValueAtTime(bubbleStartF * 1.3, tDrop + dropDur);
-      const peakG = (isGiantCat ? 0.048 : 0.038) * (0.75 + Math.random() * 0.35);
-      dropGain.gain.setValueAtTime(0.0004, tDrop);
-      dropGain.gain.linearRampToValueAtTime(peakG, tDrop + 0.007);
-      dropGain.gain.exponentialRampToValueAtTime(0.0004, tDrop + dropDur);
-      dropOsc.connect(dropGain); dropGain.connect(audioCtx.destination);
-      dropOsc.start(tDrop); dropOsc.stop(tDrop + dropDur + 0.005);
-    }
     } catch (e) { }
   }
 
@@ -718,46 +720,46 @@ const __outerGlobalRef = (typeof globalThis !== 'undefined' && globalThis) ? glo
   function playWarmAcousticNote(freqStart, freqEnd, startTime, duration, peakGain = 0.065, waveType = 'sine', cutoffHz = 1100) {
     if (!audioCtx || typeof audioCtx.createOscillator !== 'function') return;
     try {
-    const osc = audioCtx.createOscillator();
-    const lp = audioCtx.createBiquadFilter();
-    const g = audioCtx.createGain();
-    osc.type = waveType;
-    osc.frequency.setValueAtTime(Math.max(24, freqStart), startTime);
-    if (freqEnd && Math.abs(freqEnd - freqStart) > 1) {
-      osc.frequency.exponentialRampToValueAtTime(Math.max(24, freqEnd), startTime + duration);
-    }
-    lp.type = 'lowpass';
-    lp.frequency.setValueAtTime(cutoffHz, startTime);
-    g.gain.setValueAtTime(0.0004, startTime);
-    g.gain.linearRampToValueAtTime(peakGain, startTime + Math.min(0.008, duration * 0.22));
-    g.gain.exponentialRampToValueAtTime(0.0004, startTime + duration);
-    osc.connect(lp); lp.connect(g); g.connect(audioCtx.destination);
-    osc.start(startTime);
-    osc.stop(startTime + duration + 0.008);
+      const osc = audioCtx.createOscillator();
+      const lp = audioCtx.createBiquadFilter();
+      const g = audioCtx.createGain();
+      osc.type = waveType;
+      osc.frequency.setValueAtTime(Math.max(24, freqStart), startTime);
+      if (freqEnd && Math.abs(freqEnd - freqStart) > 1) {
+        osc.frequency.exponentialRampToValueAtTime(Math.max(24, freqEnd), startTime + duration);
+      }
+      lp.type = 'lowpass';
+      lp.frequency.setValueAtTime(cutoffHz, startTime);
+      g.gain.setValueAtTime(0.0004, startTime);
+      g.gain.linearRampToValueAtTime(peakGain, startTime + Math.min(0.008, duration * 0.22));
+      g.gain.exponentialRampToValueAtTime(0.0004, startTime + duration);
+      osc.connect(lp); lp.connect(g); g.connect(audioCtx.destination);
+      osc.start(startTime);
+      osc.stop(startTime + duration + 0.008);
     } catch (e) { }
   }
 
   function playNoiseBrush(startTime, duration, freqStart, freqEnd, qVal = 3.0, peakGain = 0.05) {
     if (!audioCtx || typeof audioCtx.createOscillator !== 'function') return;
     try {
-    const noiseBuf = getPinkNoiseBuffer();
-    if (!noiseBuf) return;
-    const src = audioCtx.createBufferSource();
-    src.buffer = noiseBuf;
-    const bp = audioCtx.createBiquadFilter();
-    bp.type = 'bandpass';
-    if (bp.Q && typeof bp.Q.setValueAtTime === 'function') bp.Q.setValueAtTime(qVal, startTime); else if (bp.Q) bp.Q.value = qVal;
-    bp.frequency.setValueAtTime(freqStart, startTime);
-    if (freqEnd && Math.abs(freqEnd - freqStart) > 5) {
-      bp.frequency.exponentialRampToValueAtTime(freqEnd, startTime + duration);
-    }
-    const g = audioCtx.createGain();
-    g.gain.setValueAtTime(0.0004, startTime);
-    g.gain.linearRampToValueAtTime(peakGain, startTime + Math.min(0.012, duration * 0.28));
-    g.gain.exponentialRampToValueAtTime(0.0004, startTime + duration);
-    src.connect(bp); bp.connect(g); g.connect(audioCtx.destination);
-    src.start(startTime);
-    src.stop(startTime + duration + 0.01);
+      const noiseBuf = getPinkNoiseBuffer();
+      if (!noiseBuf) return;
+      const src = audioCtx.createBufferSource();
+      src.buffer = noiseBuf;
+      const bp = audioCtx.createBiquadFilter();
+      bp.type = 'bandpass';
+      if (bp.Q && typeof bp.Q.setValueAtTime === 'function') bp.Q.setValueAtTime(qVal, startTime); else if (bp.Q) bp.Q.value = qVal;
+      bp.frequency.setValueAtTime(freqStart, startTime);
+      if (freqEnd && Math.abs(freqEnd - freqStart) > 5) {
+        bp.frequency.exponentialRampToValueAtTime(freqEnd, startTime + duration);
+      }
+      const g = audioCtx.createGain();
+      g.gain.setValueAtTime(0.0004, startTime);
+      g.gain.linearRampToValueAtTime(peakGain, startTime + Math.min(0.012, duration * 0.28));
+      g.gain.exponentialRampToValueAtTime(0.0004, startTime + duration);
+      src.connect(bp); bp.connect(g); g.connect(audioCtx.destination);
+      src.start(startTime);
+      src.stop(startTime + duration + 0.01);
     } catch (e) { }
   }
 
@@ -2204,12 +2206,13 @@ const __outerGlobalRef = (typeof globalThis !== 'undefined' && globalThis) ? glo
       });
     }
 
-    const dockIds = ['dock-restart-btn', 'shuffle-btn', 'undo-btn', 'hint-btn', 'add-bottle-btn'];
+    // 底部仅保留【重排】、【撤回】、【提示】三个辅助道具按钮（空瓶仅通过点击广告瓶解锁）
+    const dockIds = ['shuffle-btn', 'undo-btn', 'hint-btn'];
     const dockBtns = {};
-    const dGap = Math.min(11, Math.max(7, W * 0.022));
-    const maxBtnW = Math.floor((shellW - 24 - dGap * 4) / 5);
-    const btnSize = Math.min(62, Math.max(50, Math.min(maxBtnW, H * 0.072)));
-    const totalDockW = btnSize * 5 + dGap * 4;
+    const dGap = Math.min(28, Math.max(18, Math.round(W * 0.06)));
+    const maxBtnW = Math.floor((shellW - 48 - dGap * 2) / 3);
+    const btnSize = Math.min(60, Math.max(50, Math.min(maxBtnW, H * 0.070)));
+    const totalDockW = btnSize * 3 + dGap * 2;
     const startDockX = shellX + (shellW - totalDockW) * 0.5;
     const dockTop = H - safeB - btnSize - 26;
 
@@ -2217,15 +2220,27 @@ const __outerGlobalRef = (typeof globalThis !== 'undefined' && globalThis) ? glo
       const br = makeRect(startDockX + bIdx * (btnSize + dGap), dockTop, btnSize, btnSize);
       dockBtns[id] = {
         btn: br,
-        badge: id === 'dock-restart-btn' ? null : makeRect(br.right - 21, br.top + 1, 21, 17)
+        badge: makeRect(br.right - 21, br.top + 1, 21, 17)
       };
     });
 
+    // 适配微信小游戏右上角原生胶囊按钮（通过 getMenuButtonBoundingClientRect 动态避让，并将【设置】与【？图鉴】并排放置在左上角安全区，彻底杜绝右上角遮挡！）
+    let topBtnY = safeT + 8;
+    let topBtnSize = 44;
+    if (nativeApi && typeof nativeApi.getMenuButtonBoundingClientRect === 'function') {
+      try {
+        const menuRect = nativeApi.getMenuButtonBoundingClientRect();
+        if (menuRect && menuRect.top > 0) {
+          topBtnY = Math.max(8, menuRect.top + (menuRect.height - topBtnSize) * 0.5);
+        }
+      } catch (e) { }
+    }
+
     layoutCache = {
       shellRect: makeRect(shellX, 0, shellW, H),
-      settingsBtn: makeRect(shellX + 14, safeT + 8, 52, 52),
-      rulesBtn: makeRect(shellX + shellW - 14 - 52, safeT + 8, 52, 52),
-      centerLvTrigger: makeRect(shellX + shellW * 0.5 - 85, safeT + 8, 170, 50),
+      settingsBtn: makeRect(shellX + 12, topBtnY, topBtnSize, topBtnSize),
+      rulesBtn: makeRect(shellX + 12 + topBtnSize + 8, topBtnY, topBtnSize, topBtnSize),
+      centerLvTrigger: makeRect(shellX + shellW * 0.5 - 76, topBtnY - 2, 152, 50),
       modeBanner: makeRect(shellX + 16, bannerTop, shellW - 32, 34),
       modeBannerProg: makeRect(shellX + 178, bannerTop + 6, 68, 22),
       movesCounterPill: makeRect(shellX + shellW - 16 - 92, bannerTop + 4, 88, 26),
@@ -3097,7 +3112,7 @@ const __outerGlobalRef = (typeof globalThis !== 'undefined' && globalThis) ? glo
         playSound(item.wasIce ? 'ice_break' : 'stone_break');
         triggerBottleVFX(item.bIdx, item.type);
         if (item.frozeMouth) {
-          showToast('⏳ 星砂耗尽！该瓶已被寒冰封印 3 回合（可点【+空瓶】立即破除）！');
+          showToast('⏳ 星砂耗尽！该瓶已被寒冰封印 3 回合（可点【重排】破除）！');
         } else if (item.unfreezeMouth) {
           showToast('❄️ 瓶口寒冰封印已消退！');
         } else if (item.broke) {
@@ -6181,11 +6196,11 @@ const __outerGlobalRef = (typeof globalThis !== 'undefined' && globalThis) ? glo
         let curY = bottomY;
         const sloshSin = Math.sin(sloshPhase);
         const sloshCos = Math.cos(sloshPhase * 1.35);
-        const topTiltY = sloshAmplitude * 7.2 * sloshSin;
-        const waveCrest = sloshAmplitude * 4.2 * sloshCos;
-        const ryDynamic = ry + sloshAmplitude * 1.8 * sloshCos;
+        const topTiltY = sloshAmplitude * 6.5 * sloshSin;
+        const waveCrest = sloshAmplitude * 3.8 * sloshCos;
+        // 向上凸出的水表面张力拱高（正表面应力饱满上拱穹顶，告别向下凹陷感！）
+        const domeRy = Math.max(6.2, ry * 1.12 + sloshAmplitude * 1.5 * sloshCos);
 
-        // 倒序或正序绘制每层实心圆柱体：下层先画，上层自带向下弯曲的前壁底弧 (A rx,ry 0 0,1) 自然严丝合缝盖住下层顶部，100% 实心无重影！
         for (let i = 0; i < groups.length; i++) {
           const g = groups[i];
           const h = g.amount * layerH;
@@ -6200,52 +6215,80 @@ const __outerGlobalRef = (typeof globalThis !== 'undefined' && globalThis) ? glo
           const curTiltY = isTopGroup ? topTiltY : (topTiltY * 0.32 * ((i + 1) / groups.length));
           const curWave = isTopGroup ? waveCrest : (waveCrest * 0.25);
 
-          const yTL = yTop - curTiltY, yTR = yTop + curTiltY;
-          const yBL = yBotDraw - prevTiltY, yBR = yBotDraw + prevTiltY;
+          // 顶沿适当下移 2.5px 作为拱脚，使向上凸出的拱顶 (A rx,domeRy 0 0,1) 饱满拱起，充满表面张力！
+          const rimDrop = 2.4;
+          const yTL = yTop + rimDrop - curTiltY;
+          const yTR = yTop + rimDrop + curTiltY;
+          const yBL = (i === 0) ? yBotDraw : (yBotDraw + rimDrop - prevTiltY);
+          const yBR = (i === 0) ? yBotDraw : (yBotDraw + rimDrop + prevTiltY);
 
           const colInfo = COLORS[g.colorKey] || COLORS.blue;
-          // 为保证下层与上层交界处无任何缝隙，非顶层向上微延 1.5px 由上层弧形底沿自然遮盖
-          const yTLFill = isTopGroup ? yTL : (yTL - 1.5);
-          const yTRFill = isTopGroup ? yTR : (yTR - 1.5);
-          const layerPath = (sloshAmplitude > 0.01 && isTopGroup)
-            ? new Path2D(`M ${leftX},${yTLFill} C ${50 - rx * 0.45},${yTop - curTiltY * 0.3 + curWave} ${50 + rx * 0.45},${yTop + curTiltY * 0.3 - curWave} ${rightX},${yTRFill} L ${rightX},${yBR} A ${rx},${ry} 0 0,1 ${leftX},${yBL} Z`)
-            : new Path2D(`M ${leftX},${yTLFill} L ${rightX},${yTRFill} L ${rightX},${yBR} A ${rx},${ry} 0 0,1 ${leftX},${yBL} Z`);
+          const curDomeRy = isTopGroup ? domeRy : (ry * 0.96);
+          const prevDomeRy = (i === 0) ? ry : (ry * 0.96);
+
+          // 关键几何改造：
+          // - 顶边从 leftX 到 rightX 采用 A rx,curDomeRy 0 0,1（在屏幕坐标系中顺时针经过上方顶点 y - curDomeRy，形成【向上凸出】的饱满张力弧面！）
+          // - 若 i === 0（最底层），底边贴合玻璃瓶底向下圆弧 (A rx,ry 0 0,1)；
+          // - 若 i > 0（上层药水），底边从 rightX 回到 leftX 采用 A rx,prevDomeRy 0 0,0（同样经过上方顶点，与下层向上凸出的顶面 100% 严丝合缝咬合！）
+          let topEdgeCmd = `A ${rx},${curDomeRy.toFixed(2)} 0 0,1 ${rightX},${yTR.toFixed(2)}`;
+          if (sloshAmplitude > 0.01 && isTopGroup) {
+            const apexY = yTop + rimDrop - curDomeRy * 1.25 - curWave;
+            topEdgeCmd = `C ${50 - rx * 0.48},${(apexY - curTiltY * 0.35).toFixed(2)} ${50 + rx * 0.48},${(apexY + curTiltY * 0.35).toFixed(2)} ${rightX},${yTR.toFixed(2)}`;
+          }
+          const botEdgeCmd = (i === 0)
+            ? `A ${rx},${ry} 0 0,1 ${leftX},${yBL.toFixed(2)}`
+            : `A ${rx},${prevDomeRy.toFixed(2)} 0 0,0 ${leftX},${(yBL + 0.8).toFixed(2)}`;
+
+          const layerPath = new Path2D(`M ${leftX},${yTL.toFixed(2)} ${topEdgeCmd} L ${rightX},${(i === 0 ? yBR : yBR + 0.8).toFixed(2)} ${botEdgeCmd} Z`);
 
           ctx.save();
           ctx.globalAlpha = 1.0;
           ctx.fillStyle = createCanvasLiquidGrad(ctx, gradId);
           ctx.fill(layerPath);
 
-          // 液体圆柱内部左前侧 3D 柔和高光亮柱（赋予固体果冻/琉璃秘药般的浑厚立体感）
           ctx.clip(layerPath);
-          const cylSpecG = ctx.createLinearGradient(25, 0, 39, 0);
+
+          // (1) 顶部向上凸起的表面张力水润渐变过渡层（与下方柱体自然融为一体，绝不产生下凹分界线！）
+          if (g.colorKey !== "mystery_dark") {
+            const crownApexY = yTop + rimDrop - curDomeRy;
+            const tensionG = ctx.createLinearGradient(0, crownApexY - 1, 0, yTop + rimDrop + (isTopGroup ? 16 : 9));
+            tensionG.addColorStop(0.00, colInfo.topLight);
+            tensionG.addColorStop(0.28, colInfo.topRim || colInfo.topMid);
+            tensionG.addColorStop(0.62, colInfo.topMid || colInfo.mid);
+            tensionG.addColorStop(1.00, "rgba(255, 255, 255, 0)");
+            ctx.fillStyle = tensionG;
+            ctx.fillRect(leftX - 2, crownApexY - 4, rx * 2 + 4, curDomeRy + (isTopGroup ? 20 : 12));
+          }
+
+          // (2) 液体圆柱内部左前侧 3D 柔和高光亮柱
+          const cylSpecG = ctx.createLinearGradient(24, 0, 39, 0);
           cylSpecG.addColorStop(0, "rgba(255, 255, 255, 0)");
-          cylSpecG.addColorStop(0.45, g.colorKey === "mystery_dark" ? "rgba(148, 163, 184, 0.16)" : "rgba(255, 255, 255, 0.22)");
+          cylSpecG.addColorStop(0.45, g.colorKey === "mystery_dark" ? "rgba(148, 163, 184, 0.16)" : "rgba(255, 255, 255, 0.24)");
           cylSpecG.addColorStop(1, "rgba(255, 255, 255, 0)");
           ctx.fillStyle = cylSpecG;
-          ctx.fillRect(25, yTop - 4, 14, h + 12);
+          ctx.fillRect(24, yTop - curDomeRy - 2, 15, h + curDomeRy + 14);
 
-          // 每层底沿内部微暗体积压边（增强层与层之间的厚重体块感）
+          // (3) 每层底沿内部微暗体积压边
           const botDepthG = ctx.createLinearGradient(0, yBotDraw - Math.min(12, h * 0.35), 0, yBotDraw + ry);
           botDepthG.addColorStop(0, "rgba(0, 0, 0, 0)");
-          botDepthG.addColorStop(1, "rgba(10, 15, 30, 0.22)");
+          botDepthG.addColorStop(1, "rgba(10, 15, 30, 0.20)");
           ctx.fillStyle = botDepthG;
           ctx.fillRect(leftX, yBotDraw - Math.min(12, h * 0.35), rx * 2, Math.min(12, h * 0.35) + ry + 2);
           ctx.restore();
 
-          // 分层交界处：仅绘制前壁单弧 3D 立体倒角亮边（绝不画后半圈全椭圆，彻底杜绝图4的半透明空心感！）
+          // 分层交界处：沿着【向上凸起】的层间弧顶绘制高光张力棱线（PI*1.06 ~ PI*1.94 为上半圈向上拱弧！）
           if (i > 0) {
             ctx.save();
             ctx.beginPath();
-            ctx.ellipse(50, yBotDraw + 0.8, rx - 0.5, ry, 0, 0.05 * Math.PI, 0.95 * Math.PI, false);
-            ctx.strokeStyle = "rgba(15, 23, 42, 0.32)";
-            ctx.lineWidth = 1.5;
+            ctx.ellipse(50, yBotDraw + rimDrop + 0.6, rx - 0.6, prevDomeRy, 0, Math.PI * 1.05, Math.PI * 1.95, false);
+            ctx.strokeStyle = "rgba(15, 23, 42, 0.26)";
+            ctx.lineWidth = 1.4;
             ctx.stroke();
 
             ctx.beginPath();
-            ctx.ellipse(50, yBotDraw - 0.3, rx - 0.8, ry, 0, 0.06 * Math.PI, 0.94 * Math.PI, false);
+            ctx.ellipse(50, yBotDraw + rimDrop - 0.5, rx - 0.8, prevDomeRy, 0, Math.PI * 1.07, Math.PI * 1.93, false);
             ctx.strokeStyle = g.colorKey === "mystery_dark" ? "rgba(148, 163, 184, 0.45)" : colInfo.topLight;
-            ctx.lineWidth = 1.35;
+            ctx.lineWidth = 1.4;
             ctx.stroke();
             ctx.restore();
           }
@@ -6257,7 +6300,7 @@ const __outerGlobalRef = (typeof globalThis !== 'undefined' && globalThis) ? glo
           ctx.textAlign = "center";
           ctx.textBaseline = "middle";
           for (let m = 0; m < Math.min(mysteryCount, layers.length); m++) {
-            const qCenterY = bottomY - (m + 0.5) * layerH + ry * 0.45;
+            const qCenterY = bottomY - (m + 0.5) * layerH + ry * 0.25;
             ctx.strokeStyle = "rgba(9, 15, 29, 0.75)";
             ctx.lineWidth = 3.2;
             ctx.strokeText("?", 50, qCenterY);
@@ -6267,48 +6310,49 @@ const __outerGlobalRef = (typeof globalThis !== 'undefined' && globalThis) ? glo
           ctx.restore();
         }
 
-        // 顶层 3D 实心厚弯月液面（带左前高光斑 + 前唇亮白折射弧 + 后壁内缘暗弧）
+        // 顶层液面：强化【向上凸出】的水表面张力弯月高光冠（绝不画向下凹的亮线！）
         const topColorKey = groups[groups.length - 1].colorKey;
         const colTop = COLORS[topColorKey] || { topLight: "#7a96ff", topRim: "#5b7cfa", topMid: "#3b5bdb", left: "#2841b5", right: "#1c2d87" };
-        const topGradId = topColorKey === "mystery_dark" ? "top-mystery" : `top-${topColorKey}`;
         const surfaceTiltRad = Math.atan2(topTiltY * 2, rx * 2);
         const shoulderRx = getShoulderRxAtY(curY, maxCap, isGiantCat);
-        const topRxEff = Math.min(rx + 0.5, shoulderRx + 0.5);
-        const topRyEff = Math.max(2.2, (ryDynamic + 0.6) * (topRxEff / (rx + 0.5)));
-        const menCy = waveCrest * 0.22;
+        const topRxEff = Math.min(rx, shoulderRx);
+        const topDomeRy = Math.max(5.8, domeRy * (topRxEff / rx));
+        const rimDrop = 2.4;
 
         ctx.save();
-        ctx.translate(50, curY);
+        ctx.translate(50, curY + rimDrop);
         ctx.rotate(surfaceTiltRad);
         ctx.globalAlpha = 1.0;
 
-        // (a) 实心液面主椭圆
-        ctx.beginPath();
-        ctx.ellipse(0, menCy, topRxEff, topRyEff, 0, 0, Math.PI * 2);
-        ctx.fillStyle = createCanvasLiquidGrad(ctx, topGradId);
-        ctx.fill();
-
-        // (b) 液面左前侧高光椭圆斑（增强液面油润饱满感）
+        // (a) 向上拱起的水珠表面张力月牙高光斑（紧贴上拱弧顶内侧，呈现饱满凸起表面张力感）
         if (topColorKey !== "mystery_dark") {
+          const domeGlow = ctx.createRadialGradient(-topRxEff * 0.16, -topDomeRy * 0.58, 1, 0, -topDomeRy * 0.25, topRxEff * 0.85);
+          domeGlow.addColorStop(0.00, "rgba(255, 255, 255, 0.52)");
+          domeGlow.addColorStop(0.45, "rgba(255, 255, 255, 0.18)");
+          domeGlow.addColorStop(1.00, "rgba(255, 255, 255, 0)");
+          ctx.fillStyle = domeGlow;
           ctx.beginPath();
-          ctx.ellipse(-topRxEff * 0.24, menCy - topRyEff * 0.12, topRxEff * 0.42, topRyEff * 0.48, -0.08, 0, Math.PI * 2);
-          ctx.fillStyle = "rgba(255, 255, 255, 0.28)";
+          ctx.ellipse(0, 0, topRxEff - 1.2, topDomeRy - 0.4, 0, Math.PI, Math.PI * 2, false);
+          ctx.closePath();
           ctx.fill();
+
+          // 拱顶左前侧水珠张力反光眉弧（向上弯曲）
+          ctx.strokeStyle = "rgba(255, 255, 255, 0.68)";
+          ctx.lineWidth = 2.1;
+          ctx.lineCap = "round";
+          ctx.beginPath();
+          ctx.ellipse(0, 1.6, Math.max(2, topRxEff * 0.72), Math.max(2, topDomeRy * 0.76), 0, Math.PI * 1.15, Math.PI * 1.72, false);
+          ctx.stroke();
         }
 
-        // (c) 液面后缘玻璃接触暗弧
-        ctx.strokeStyle = topColorKey === "mystery_dark" ? "#0f172a" : (colTop.right || "#1e293b");
-        ctx.lineWidth = 1.1;
+        // (b) 向上凸出的液面最高冠部张力亮边弧（PI*1.03 ~ PI*1.97，向上拱起！）
+        ctx.strokeStyle = topColorKey === "mystery_dark" ? "#94a3b8" : colTop.topLight;
+        ctx.lineWidth = 1.85;
+        ctx.lineCap = "round";
         ctx.beginPath();
-        ctx.ellipse(0, menCy, Math.max(1, topRxEff - 0.5), Math.max(0.8, topRyEff - 0.2), 0, Math.PI * 1.05, Math.PI * 1.95, false);
+        ctx.ellipse(0, 0, Math.max(1, topRxEff - 0.6), Math.max(1, topDomeRy - 0.2), 0, Math.PI * 1.03, Math.PI * 1.97, false);
         ctx.stroke();
 
-        // (d) 液面前唇立体亮边弧
-        ctx.strokeStyle = topColorKey === "mystery_dark" ? "#94a3b8" : colTop.topLight;
-        ctx.lineWidth = 1.65;
-        ctx.beginPath();
-        ctx.ellipse(0, menCy + 0.2, Math.max(1, topRxEff - 0.8), Math.max(0.8, topRyEff - 0.3), 0, 0.04 * Math.PI, 0.96 * Math.PI, false);
-        ctx.stroke();
         ctx.restore();
         return;
       }
@@ -6385,30 +6429,63 @@ const __outerGlobalRef = (typeof globalThis !== 'undefined' && globalThis) ? glo
         const minX = -125, maxX = 225;
         const yUL = upperIf.yG + (minX - upperIf.chord.cx) * upperTan;
         const yUR = upperIf.yG + (maxX - upperIf.chord.cx) * upperTan;
-        const yBotBase = (i === 0) ? (lowerIf.yG + 18) : lowerIf.yG;
+        const yBotBase = (i === 0) ? (lowerIf.yG + 18) : (lowerIf.yG + 0.6);
         const yBL = yBotBase + (minX - lowerIf.chord.cx) * lowerTan;
         const yBR = yBotBase + (maxX - lowerIf.chord.cx) * lowerTan;
-        const botRx = (maxX - minX) * 0.52;
-        const botRy = (i === 0) ? 4 : Math.min(11.5, Math.max(7.2, lowerIf.chord.rx * 0.23));
-        const gradId = g.colorKey === "mystery_dark" ? "liq-mystery" : `liq-${g.colorKey}`;
-        ctx.fillStyle = createCanvasLiquidGrad(ctx, gradId);
-        ctx.fill(new Path2D(`M ${minX},${yUL.toFixed(2)} L ${maxX},${yUR.toFixed(2)} L ${maxX},${yBR.toFixed(2)} A ${botRx.toFixed(2)},${botRy.toFixed(2)} ${lowerRelDeg.toFixed(2)} 0,1 ${minX},${yBL.toFixed(2)} Z`));
+        const col = COLORS[g.colorKey] || COLORS.blue;
+        const gSpanL = Math.min(lowerIf.chord.cx - lowerIf.chord.rx, upperIf.chord.cx - upperIf.chord.rx) - 4;
+        const gSpanR = Math.max(lowerIf.chord.cx + lowerIf.chord.rx, upperIf.chord.cx + upperIf.chord.rx) + 4;
+        const lg = ctx.createLinearGradient(gSpanL, 0, gSpanR, 0);
+        if (g.colorKey === "mystery_dark") {
+          lg.addColorStop(0.00, "#090f1d");
+          lg.addColorStop(0.22, "#1e293b");
+          lg.addColorStop(0.45, "#475569");
+          lg.addColorStop(0.75, "#1e293b");
+          lg.addColorStop(1.00, "#090f1d");
+        } else {
+          lg.addColorStop(0.00, col.right);
+          lg.addColorStop(0.16, col.left);
+          lg.addColorStop(0.38, col.mid);
+          lg.addColorStop(0.68, col.left);
+          lg.addColorStop(0.90, col.right);
+          lg.addColorStop(1.00, col.left);
+        }
+        ctx.fillStyle = lg;
+        ctx.beginPath();
+        ctx.moveTo(minX, yUL);
+        ctx.lineTo(maxX, yUR);
+        ctx.lineTo(maxX, yBR);
+        ctx.lineTo(minX, yBL);
+        ctx.closePath();
+        ctx.fill();
+
+        if (i > 0) {
+          ctx.save();
+          ctx.strokeStyle = g.colorKey === "mystery_dark" ? "rgba(148, 163, 184, 0.4)" : col.topLight;
+          ctx.lineWidth = 1.25;
+          ctx.beginPath();
+          ctx.moveTo(lowerIf.chord.cx - lowerIf.chord.rx, lowerIf.yG - lowerIf.chord.rx * lowerTan);
+          ctx.quadraticCurveTo(lowerIf.chord.cx, lowerIf.yG - 2.2, lowerIf.chord.cx + lowerIf.chord.rx, lowerIf.yG + lowerIf.chord.rx * lowerTan);
+          ctx.stroke();
+          ctx.restore();
+        }
       }
 
       const topIf = interfaces[numGroups], topChord = topIf.chord;
       const topRx = Math.max(0.5, topChord.rx + 0.4);
-      const topRy = Math.max(0.5, Math.min(10.8, Math.max(6.8, totalGravityDepth * 0.72), Math.max(7.2, topChord.rx * 0.22)));
+      const topRy = Math.max(0.5, Math.min(10.8, Math.max(6.8, totalGravityDepth * 0.72), Math.max(7.2, topChord.rx * 0.24)));
       const topColorKey = groups[numGroups - 1].colorKey;
       const colTop = COLORS[topColorKey] || COLORS.blue;
       const topGradId = topColorKey === "mystery_dark" ? "top-mystery" : `top-${topColorKey}`;
       ctx.beginPath();
-      ctx.ellipse(topChord.cx, topIf.yG, topRx, topRy, 0, 0, Math.PI * 2);
+      ctx.ellipse(topChord.cx, topIf.yG, topRx, topRy, 0, Math.PI, Math.PI * 2, false);
+      ctx.closePath();
       ctx.fillStyle = createCanvasLiquidGrad(ctx, topGradId);
       ctx.fill();
       ctx.strokeStyle = topColorKey === "mystery_dark" ? "#94a3b8" : colTop.topLight;
-      ctx.lineWidth = 1.4;
+      ctx.lineWidth = 1.6;
       ctx.beginPath();
-      ctx.ellipse(topChord.cx, topIf.yG, Math.max(0.5, topRx - 0.8), Math.max(0.5, topRy - 0.3), 0, 0.05 * Math.PI, 0.95 * Math.PI, false);
+      ctx.ellipse(topChord.cx, topIf.yG, Math.max(0.5, topRx - 0.8), Math.max(0.5, topRy - 0.3), 0, Math.PI * 1.05, Math.PI * 1.95, false);
       ctx.stroke();
       ctx.restore();
     }
@@ -6793,63 +6870,19 @@ const __outerGlobalRef = (typeof globalThis !== 'undefined' && globalThis) ? glo
       if (!pState || !pState.active) return;
       const { trailHistory, colObj, phase, p, streamCtx, bodyPose } = pState;
 
-      // 0. 绘制倾倒中水瓶的瓶身流光气场与 14 颗环绕四角星芒微粒（恢复瓶子抬起倒水特效！）
+      // 0. 仅绘制环绕瓶身外围的灵动四角星芒微粒（去除覆盖在瓶身上的半透明色雾椭圆与色带，保持倾倒时琉璃瓶身100%通透干净！）
       if (bodyPose && colObj) {
-        const { cx, cy, deg, w, h } = bodyPose;
-        const auraOp = phase === 'pour' ? 0.34 : (Math.sin(p * Math.PI) * 0.28 + 0.08);
-        ctx.save();
-        ctx.translate(cx, cy);
-        ctx.rotate(((deg || 0) * Math.PI) / 180);
-        const ag = ctx.createRadialGradient(0, 0, 8, 0, 0, Math.max(w, h) * 0.65);
-        ag.addColorStop(0, colObj.topLight || '#fef08a');
-        ag.addColorStop(0.55, colObj.mid || '#facc15');
-        ag.addColorStop(1, 'rgba(255,255,255,0)');
-        ctx.globalAlpha = auraOp;
-        ctx.fillStyle = ag;
-        ctx.beginPath();
-        ctx.ellipse(0, 0, w * 0.66, h * 0.56, 0, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.restore();
-
+        const { cx, cy, w, h } = bodyPose;
         const nowT = performance.now() * 0.003;
-        for (let i = 0; i < 12; i++) {
+        for (let i = 0; i < 10; i++) {
           const seedA = hash01(i * 31 + 7) * Math.PI * 2 + nowT * (i % 2 === 0 ? 1.1 : -0.9);
-          const rx = (w * 0.42) + hash01(i * 17 + 3) * 22;
-          const ry = (h * 0.40) + hash01(i * 23 + 5) * 24;
+          const rx = (w * 0.54) + hash01(i * 17 + 3) * 18;
+          const ry = (h * 0.46) + hash01(i * 23 + 5) * 18;
           const sx = cx + Math.cos(seedA) * rx;
-          const sy = cy + Math.sin(seedA) * ry - ((nowT * 18 + i * 9) % 24);
-          const sr = 2.4 + (i % 3) * 1.1;
-          const sAlpha = (0.45 + 0.45 * Math.sin(nowT * 3 + i)) * (phase === 'return' ? (1 - p * 0.7) : 1);
+          const sy = cy + Math.sin(seedA) * ry - ((nowT * 16 + i * 9) % 20);
+          const sr = 2.2 + (i % 3) * 0.95;
+          const sAlpha = (0.42 + 0.42 * Math.sin(nowT * 3 + i)) * (phase === 'return' ? (1 - p * 0.7) : 1);
           drawGlowingStar2D(ctx, sx, sy, sr, nowT + i, sAlpha);
-        }
-      }
-
-      if (trailHistory && trailHistory.length >= 2) {
-        const firstPt = trailHistory[0];
-        const lastPt = trailHistory[trailHistory.length - 1];
-        const moveSpan = Math.hypot(lastPt.cx - firstPt.cx, lastPt.cy - firstPt.cy);
-        if (moveSpan > 4) {
-          const upperPts = [], lowerPts = [];
-          const n = trailHistory.length;
-          for (let i = 0; i < n; i++) {
-            const t = i / (n - 1);
-            const pt = trailHistory[i];
-            const halfW = (pt.halfH || 28) * Math.pow(t, 1.35) * 0.68;
-            const rad = ((pt.deg || 0) * Math.PI) / 180;
-            const nx = -Math.sin(rad), ny = Math.cos(rad);
-            upperPts.push(`${(pt.cx + nx * halfW).toFixed(1)},${(pt.cy + ny * halfW).toFixed(1)}`);
-            lowerPts.push(`${(pt.cx - nx * halfW).toFixed(1)},${(pt.cy - ny * halfW).toFixed(1)}`);
-          }
-          const wakeOp = phase === 'move' ? (Math.sin(p * Math.PI) * 0.28 + 0.05) : (phase === 'return' ? (1 - p) * 0.20 : 0.08);
-          ctx.save();
-          const g = ctx.createLinearGradient(firstPt.cx, firstPt.cy, lastPt.cx, lastPt.cy);
-          g.addColorStop(0, 'rgba(255,255,255,0)');
-          g.addColorStop(0.55, `rgba(255,255,255,${(wakeOp * 0.5).toFixed(3)})`);
-          g.addColorStop(1, colObj ? colObj.topLight : '#ffffff');
-          ctx.globalAlpha = wakeOp;
-          ctx.fillStyle = g;
-          ctx.fill(new Path2D(`M ${upperPts.join(' L ')} L ${lowerPts.reverse().join(' L ')} Z`));
-          ctx.restore();
         }
       }
 
@@ -7614,14 +7647,15 @@ const __outerGlobalRef = (typeof globalThis !== 'undefined' && globalThis) ? glo
 
       // ====================================================================
       // 弹窗 B：设置页面 (pause-modal-mask)
+      // 已按要求：默认微缩舞台并移除微缩开关、移除提速按钮、移除跳过按钮、倍速开放至 3 倍速！
       // ====================================================================
       if (maskId === 'pause-modal-mask') {
         const pillW = Math.min(w - 32, 336);
         const pillX = (w - pillW) * 0.5;
-        const totalH = 100 + 4 * 52 + 72 + 56 + 52;
-        const ribTopY = Math.max(18, (h - totalH) * 0.45);
+        const totalH = 100 + 3 * 52 + 72 + 56 + 52;
+        const ribTopY = Math.max(24, (h - totalH) * 0.46);
 
-        drawFig2SpotlightRays(ctx, w * 0.5, ribTopY + 230, 175, nowMs, 0.65);
+        drawFig2SpotlightRays(ctx, w * 0.5, ribTopY + 210, 175, nowMs, 0.65);
         drawFig2RibbonHeader(ctx, w * 0.5, ribTopY, bannerW, 98, '设置');
 
         const xW = 38, xH = 38;
@@ -7651,8 +7685,7 @@ const __outerGlobalRef = (typeof globalThis !== 'undefined' && globalThis) ? glo
         const settingItems = [
           { key: 'sound', label: '音效', isOn: !!userSettings.sound },
           { key: 'vibrate', label: '震动', isOn: !!userSettings.vibrate },
-          { key: 'music', label: '音乐', isOn: !!userSettings.music },
-          { key: 'zoom', label: '微缩舞台', isOn: !!userSettings.zoom }
+          { key: 'music', label: '音乐', isOn: !!userSettings.music }
         ];
         const rowsStartY = ribTopY + 104;
         settingItems.forEach((item, rIdx) => {
@@ -7686,20 +7719,13 @@ const __outerGlobalRef = (typeof globalThis !== 'undefined' && globalThis) ? glo
             ctx.moveTo(icX - 8.2, icY - 4.2); ctx.lineTo(icX - 6.8, icY - 2); ctx.lineTo(icX - 8.2, icY); ctx.lineTo(icX - 6.8, icY + 2); ctx.lineTo(icX - 8.2, icY + 4.2);
             ctx.moveTo(icX + 8.2, icY - 4.2); ctx.lineTo(icX + 6.8, icY - 2); ctx.lineTo(icX + 8.2, icY); ctx.lineTo(icX + 6.8, icY + 2); ctx.lineTo(icX + 8.2, icY + 4.2);
             ctx.stroke();
-          } else if (rIdx === 2) {
+          } else {
             ctx.beginPath();
             ctx.moveTo(icX - 2.8, icY + 5.2); ctx.lineTo(icX - 2.8, icY - 5.8);
             ctx.lineTo(icX + 6.2, icY - 7.8); ctx.lineTo(icX + 6.2, icY + 3.2);
             ctx.stroke();
             ctx.beginPath(); ctx.arc(icX - 5.4, icY + 5.2, 2.9, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
             ctx.beginPath(); ctx.arc(icX + 3.6, icY + 3.2, 2.9, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
-          } else {
-            ctx.beginPath();
-            ctx.moveTo(icX + 2.2, icY - 7.2); ctx.lineTo(icX + 7.2, icY - 7.2); ctx.lineTo(icX + 7.2, icY - 2.2);
-            ctx.moveTo(icX - 2.2, icY + 7.2); ctx.lineTo(icX - 7.2, icY + 7.2); ctx.lineTo(icX - 7.2, icY + 2.2);
-            ctx.moveTo(icX + 7.2, icY - 7.2); ctx.lineTo(icX + 1.2, icY - 1.2);
-            ctx.moveTo(icX - 7.2, icY + 7.2); ctx.lineTo(icX - 1.2, icY + 1.2);
-            ctx.stroke();
           }
 
           const tW = 72, tH = 32;
@@ -7740,40 +7766,40 @@ const __outerGlobalRef = (typeof globalThis !== 'undefined' && globalThis) ? glo
 
           registerHitRegion('toggle_' + rIdx, pillX, rY, pillW, rH, 220, () => {
             userSettings[item.key] = !userSettings[item.key];
-            if (item.key === 'zoom') renderAll();
             playSound(userSettings[item.key] ? 'toggle_on' : 'toggle_off');
           });
           ctx.restore();
         });
 
-        const featLabels = ['倍速x2', '提速', '主题', '破局'];
-        const featY = rowsStartY + 4 * 52 + 4;
-        const gap = 8;
-        const fw = (pillW - gap * 3) / 4;
+        // 3 个功能卡片：倍速(1x/2x/3x)、主题、破局
+        const featLabels = [`倍速x${speedMulStage}`, '主题', '破局'];
+        const featY = rowsStartY + 3 * 52 + 6;
+        const gap = 10;
+        const fw = (pillW - gap * 2) / 3;
         const fh = 62;
         featLabels.forEach((fLbl, fIdx) => {
           const fx = pillX + fIdx * (fw + gap);
-          const is2x = (fIdx === 0 && isSpeed2x);
+          const isFast = (fIdx === 0 && speedMulStage > 1);
           drawFig2CreamGoldPill(ctx, fx, featY, fw, fh, 16);
 
           ctx.save();
-          if (is2x) {
+          if (isFast) {
             ctx.beginPath(); ctx.roundRect(fx + 2, featY + 2, fw - 4, fh - 4, 14);
-            ctx.fillStyle = 'rgba(253, 224, 71, 0.35)'; ctx.fill();
+            ctx.fillStyle = speedMulStage === 3 ? 'rgba(251, 146, 60, 0.36)' : 'rgba(253, 224, 71, 0.35)';
+            ctx.fill();
           }
           const icX = fx + fw * 0.5, icY = featY + 22;
           if (fIdx === 0) {
-            ctx.fillStyle = '#b45309';
-            ctx.beginPath(); ctx.moveTo(icX - 8.5, icY - 5.5); ctx.lineTo(icX - 0.5, icY); ctx.lineTo(icX - 8.5, icY + 5.5); ctx.closePath(); ctx.fill();
-            ctx.beginPath(); ctx.moveTo(icX + 0.5, icY - 5.5); ctx.lineTo(icX + 8.5, icY); ctx.lineTo(icX + 0.5, icY + 5.5); ctx.closePath(); ctx.fill();
+            ctx.fillStyle = speedMulStage === 3 ? '#c2410c' : '#b45309';
+            if (speedMulStage === 3) {
+              [-9, -1, 7].forEach(dx => {
+                ctx.beginPath(); ctx.moveTo(icX + dx - 3.5, icY - 5.5); ctx.lineTo(icX + dx + 3.5, icY); ctx.lineTo(icX + dx - 3.5, icY + 5.5); ctx.closePath(); ctx.fill();
+              });
+            } else {
+              ctx.beginPath(); ctx.moveTo(icX - 8.5, icY - 5.5); ctx.lineTo(icX - 0.5, icY); ctx.lineTo(icX - 8.5, icY + 5.5); ctx.closePath(); ctx.fill();
+              ctx.beginPath(); ctx.moveTo(icX + 0.5, icY - 5.5); ctx.lineTo(icX + 8.5, icY); ctx.lineTo(icX + 0.5, icY + 5.5); ctx.closePath(); ctx.fill();
+            }
           } else if (fIdx === 1) {
-            ctx.fillStyle = '#f59e0b'; ctx.strokeStyle = '#7c3f0e'; ctx.lineWidth = 1.6; ctx.lineJoin = 'round';
-            ctx.beginPath();
-            ctx.moveTo(icX, icY - 7.8); ctx.lineTo(icX + 7.5, icY - 0.2); ctx.lineTo(icX + 3.2, icY - 0.2);
-            ctx.lineTo(icX + 3.2, icY + 7.5); ctx.lineTo(icX - 3.2, icY + 7.5); ctx.lineTo(icX - 3.2, icY - 0.2);
-            ctx.lineTo(icX - 7.5, icY - 0.2); ctx.closePath();
-            ctx.fill(); ctx.stroke();
-          } else if (fIdx === 2) {
             ctx.beginPath(); ctx.arc(icX, icY, 8.2, 0, Math.PI * 2);
             ctx.fillStyle = '#fde047'; ctx.fill();
             ctx.strokeStyle = '#7c3f0e'; ctx.lineWidth = 1.6; ctx.stroke();
@@ -7785,52 +7811,44 @@ const __outerGlobalRef = (typeof globalThis !== 'undefined' && globalThis) ? glo
           }
 
           ctx.fillStyle = '#7c3f0e';
-          ctx.font = '800 12.5px "Fredoka", "PingFang SC", "Microsoft YaHei", sans-serif';
+          ctx.font = '800 13px "Fredoka", "PingFang SC", "Microsoft YaHei", sans-serif';
           ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
           ctx.fillText(fLbl, fx + fw * 0.5, featY + fh - 14);
           ctx.restore();
 
           registerHitRegion('pause_feat_' + fIdx, fx, featY, fw, fh, 220, () => {
             if (fIdx === 0) {
-              isSpeed2x = !isSpeed2x;
-              playSound(isSpeed2x ? 'toggle_on' : 'toggle_off');
-              showToast(isSpeed2x ? '⚡ 已开启 2倍极速倒水模式！' : '⚡ 已恢复标准倒水速度');
+              speedMulStage = (speedMulStage % 3) + 1;
+              playSound(speedMulStage > 1 ? 'toggle_on' : 'toggle_off');
+              showToast(speedMulStage === 3 ? '⚡ 已开启 3倍极速倒水模式！' : (speedMulStage === 2 ? '⚡ 已开启 2倍极速倒水模式！' : '⚡ 已恢复 1倍标准倒水速度'));
             } else if (fIdx === 1) {
-              uiState.openModalId = 'speed-modal-mask';
-              playSound('select');
-            } else if (fIdx === 2) {
               renderShopItems();
               uiState.openModalId = 'shop-modal-mask';
               playSound('select');
-            } else if (fIdx === 3) {
+            } else if (fIdx === 2) {
               uiState.openModalId = null;
               unlockAllSpecials();
             }
           });
         });
 
+        // 底部第1排：仅保留【主页】与【重新开始】（已移除跳过按钮）
         const row1Y = featY + fh + 14;
         const row1H = 52;
-        draw3DGlossyModalButton(ctx, pillX, row1Y, 60, row1H, 16, MODAL_BTN_PALETTES.goldSquare, '主页', 13);
-        registerHitRegion('pause-home-btn', pillX, row1Y, 60, row1H, 220, () => {
+        const homeW = 92;
+        draw3DGlossyModalButton(ctx, pillX, row1Y, homeW, row1H, 16, MODAL_BTN_PALETTES.goldSquare, '主页', 15);
+        registerHitRegion('pause-home-btn', pillX, row1Y, homeW, row1H, 220, () => {
           openLevelSelector();
         });
 
-        draw3DGlossyModalButton(ctx, pillX + 70, row1Y, pillW - 140, row1H, 16, MODAL_BTN_PALETTES.green, '重新开始', 16.5);
-        registerHitRegion('pause-restart-btn', pillX + 70, row1Y, pillW - 140, row1H, 220, () => {
+        const restartX = pillX + homeW + 12;
+        const restartW = pillW - homeW - 12;
+        draw3DGlossyModalButton(ctx, restartX, row1Y, restartW, row1H, 16, MODAL_BTN_PALETTES.green, '重新开始', 16.5);
+        registerHitRegion('pause-restart-btn', restartX, row1Y, restartW, row1H, 220, () => {
           uiState.openModalId = null;
           playSound('btn_restart');
           initGame();
           showToast('🔄 当前关卡已重新开始');
-        });
-
-        draw3DGlossyModalButton(ctx, pillX + pillW - 60, row1Y, 60, row1H, 16, MODAL_BTN_PALETTES.coralSquare, '跳过', 13);
-        registerHitRegion('pause-skip-btn', pillX + pillW - 60, row1Y, 60, row1H, 220, () => {
-          uiState.openModalId = null;
-          playSound('ui_tap');
-          currentLevelId = (currentLevelId % 200) + 1;
-          initGame();
-          showToast(`⏭️ 已跳过并进入：关卡 ${currentLevelId}`);
         });
 
         const row2Y = row1Y + row1H + 10;
@@ -8147,600 +8165,598 @@ const __outerGlobalRef = (typeof globalThis !== 'undefined' && globalThis) ? glo
 
       ctx.save();
       try {
-      ctx.scale(dpr, dpr);
+        ctx.scale(dpr, dpr);
 
-      // 1. 直接贴入离屏缓存好的主题背景
-      const bgCan = getThemeBackgroundCanvas(viewW, viewH);
-      ctx.drawImage(bgCan, 0, 0, viewW, viewH);
+        // 1. 直接贴入离屏缓存好的主题背景
+        const bgCan = getThemeBackgroundCanvas(viewW, viewH);
+        ctx.drawImage(bgCan, 0, 0, viewW, viewH);
 
-      // 2. 直接在主画布绘制萤火微粒、满瓶飞星与礼花
-      drawBgStarFXDirectToCtx(ctx, viewW, viewH, nowMs);
+        // 2. 直接在主画布绘制萤火微粒、满瓶飞星与礼花
+        drawBgStarFXDirectToCtx(ctx, viewW, viewH, nowMs);
 
-      const cfg = getLevelConfig(currentLevelId);
+        const cfg = getLevelConfig(currentLevelId);
 
-      // 3. 顶部栏（100% 原生 Canvas 烘焙超椭圆折射玻璃按钮）
-      if (layoutCache.settingsBtn) {
-        const r = layoutCache.settingsBtn;
-        const sp = getNativeGlassButtonSprite('settings-btn');
-        const pressS = pressedHitId === 'settings-btn' ? 0.93 : 1.0;
-        ctx.save();
-        ctx.translate(r.left + r.width * 0.5, r.top + r.height * 0.5);
-        ctx.scale(pressS, pressS);
-        ctx.drawImage(sp, -r.width * 0.5, -r.height * 0.5, r.width, r.height);
-        ctx.restore();
-        registerHitRegion('settings-btn', r.left, r.top, r.width, r.height, 30, () => {
-          uiState.openModalId = 'pause-modal-mask';
-          playSound('modal_open');
-        });
-      }
-
-      if (layoutCache.rulesBtn) {
-        const r = layoutCache.rulesBtn;
-        const sp = getNativeGlassButtonSprite('rules-help-btn');
-        const pressS = pressedHitId === 'rules-help-btn' ? 0.93 : 1.0;
-        ctx.save();
-        ctx.translate(r.left + r.width * 0.5, r.top + r.height * 0.5);
-        ctx.scale(pressS, pressS);
-        ctx.drawImage(sp, -r.width * 0.5, -r.height * 0.5, r.width, r.height);
-        ctx.restore();
-        registerHitRegion('rules-help-btn', r.left, r.top, r.width, r.height, 30, () => {
-          openRulesHelpModal();
-        });
-      }
-
-      if (layoutCache.centerLvTrigger) {
-        const r = layoutCache.centerLvTrigger;
-        const cx = r.left + r.width * 0.5;
-        const cy = r.top + r.height * 0.5 - 5;
-        ctx.save();
-        ctx.font = `800 ${Math.min(32, Math.max(25, Math.round(viewH * 0.039)))}px "Fredoka", "Quicksand", "PingFang SC", "Microsoft YaHei", sans-serif`;
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillStyle = 'rgba(110, 68, 14, 0.36)';
-        ctx.fillText(`第 ${currentLevelId} 关`, cx, cy + 2.5);
-        ctx.fillStyle = '#ffffff';
-        ctx.fillText(`第 ${currentLevelId} 关`, cx, cy);
-
-        let goalTxt = '';
-        const targetTotal = Math.max(1, levelTargetTotalBottles || 4);
-        const catB = bottles.find(b => b && !b.removed && b.isGiantCat);
-        if (catB) {
-          goalTxt = `🐱 目标：灵猫收集 ${catB.layers.length}/${catB.maxCap || 8}`;
-        } else if (cfg.hasBags && bags && bags.length > 0) {
-          goalTxt = `🛍️ 目标：礼袋打包 ${Math.min(packedTotal, targetTotal)}/${targetTotal}`;
-        } else {
-          const corkedNow = bottles.filter(b => b && b.corked).length;
-          goalTxt = `🍾 目标：同色封存 ${Math.min(corkedNow, targetTotal)}/${targetTotal} 瓶`;
-        }
-        if (remainingMoves !== null) {
-          goalTxt += ` · 剩 ${remainingMoves} 步`;
-        }
-        ctx.font = '800 11px "Fredoka", "PingFang SC", sans-serif';
-        const gw = Math.max(128, ctx.measureText(goalTxt).width + 22);
-        const gh = 19;
-        const gy = cy + 21;
-        ctx.beginPath();
-        ctx.roundRect(cx - gw * 0.5, gy - gh * 0.5, gw, gh, gh * 0.5);
-        ctx.fillStyle = (remainingMoves !== null && remainingMoves <= 5) ? 'rgba(220, 38, 38, 0.86)' : 'rgba(92, 54, 12, 0.42)';
-        ctx.fill();
-        ctx.strokeStyle = 'rgba(255, 248, 220, 0.72)';
-        ctx.lineWidth = 1.2;
-        ctx.stroke();
-        ctx.fillStyle = '#fffbeb';
-        ctx.fillText(goalTxt, cx, gy + 0.5);
-        ctx.restore();
-        registerHitRegion('top-center-level-trigger', r.left - 24, r.top - 6, r.width + 48, r.height + 24, 30, () => {
-          openLevelSelector();
-        });
-      }
-
-      // 4. 顶部 4 个 3D 高定礼盒袋（含装瓶回弹、服务金铃叮当、极速拎走与新袋落下动画）
-      if (cfg.hasBags && layoutCache.bagRects.length > 0) {
-        const bagAnimMap = window._canvasBagAnimMap || {};
-        bags.forEach((bag, bIdx) => {
-          if (!bag || bag.removed) return;
-          const r = layoutCache.bagRects[bIdx];
-          if (!r) return;
-          const bagCan = getNativeBagCanvas(bag, bIdx);
-          if (bagCan) {
-            const anim = bagAnimMap[bIdx];
-            ctx.save();
-            let drawAlpha = 1;
-            const cx = r.left + r.width * 0.5;
-            const by = r.bottom;
-            if (anim) {
-              const p = Math.max(0, Math.min(1, (nowMs - anim.startTime) / Math.max(1, anim.duration)));
-              if (anim.type === 'bounce') {
-                const sx = p < 0.4 ? (1 + 0.12 * (p / 0.4)) : (1.12 - 0.12 * ((p - 0.4) / 0.6));
-                const sy = p < 0.4 ? (1 - 0.10 * (p / 0.4)) : (0.90 + 0.10 * ((p - 0.4) / 0.6));
-                ctx.translate(cx, by);
-                ctx.scale(sx, sy);
-                ctx.translate(-cx, -by);
-              } else if (anim.type === 'carry_away') {
-                const liftY = -Math.pow(p, 1.45) * 125;
-                const rot = Math.sin(p * Math.PI * 2) * 0.12;
-                drawAlpha = Math.max(0, 1 - Math.pow(p, 1.3));
-                ctx.translate(cx, r.top + r.height * 0.15 + liftY);
-                ctx.rotate(rot);
-                ctx.scale(1 - p * 0.12, 1 + p * 0.06);
-                ctx.translate(-cx, -(r.top + r.height * 0.15));
-              } else if (anim.type === 'drop_in') {
-                const easeOutBack = 1 + 1.8 * Math.pow(p - 1, 3) + 0.8 * Math.pow(p - 1, 2);
-                const dropY = (1 - easeOutBack) * -68;
-                drawAlpha = Math.min(1, p * 1.8);
-                ctx.translate(0, dropY);
-              }
-            }
-            ctx.globalAlpha = drawAlpha;
-            ctx.drawImage(bagCan, r.left, r.top, r.width, r.height);
-
-            // 若处于装瓶回弹阶段，在袋口上方绘制摇晃的 3D 金色服务铃铛
-            if (anim && anim.type === 'bounce') {
-              const p = Math.max(0, Math.min(1, (nowMs - anim.startTime) / Math.max(1, anim.duration)));
-              const bellRot = Math.sin(p * Math.PI * 5) * 0.35 * (1 - p * 0.5);
-              ctx.save();
-              ctx.translate(cx, r.top + 8);
-              ctx.rotate(bellRot);
-              ctx.fillStyle = '#facc15';
-              ctx.strokeStyle = '#b45309';
-              ctx.lineWidth = 1.5;
-              ctx.beginPath();
-              ctx.arc(0, 0, 9, Math.PI, 0, false);
-              ctx.lineTo(11, 7);
-              ctx.lineTo(-11, 7);
-              ctx.closePath();
-              ctx.fill();
-              ctx.stroke();
-              ctx.beginPath();
-              ctx.arc(0, 8.5, 2.8, 0, Math.PI * 2);
-              ctx.fillStyle = '#d97706';
-              ctx.fill();
-              ctx.restore();
-            }
-            ctx.restore();
-          }
-          registerHitRegion('bag_' + bIdx, r.left, r.top, r.width, r.height, 25, () => onBagClick(bIdx));
-        });
-      }
-
-      // 模式提示横幅
-      if (uiState.modeBannerShow && layoutCache.modeBanner) {
-        const mr = layoutCache.modeBanner;
-        ctx.save();
-        ctx.beginPath();
-        ctx.roundRect(mr.left, mr.top, mr.width, mr.height, 18);
-        ctx.fillStyle = 'rgba(235, 200, 140, 0.34)';
-        ctx.fill();
-        ctx.strokeStyle = 'rgba(255, 255, 255, 0.68)';
-        ctx.lineWidth = 1.5;
-        ctx.stroke();
-
-        const bTxt = uiState.modeBannerText || '';
-        const bProg = uiState.modeBannerProg || '';
-        ctx.fillStyle = '#ffffff';
-        ctx.font = '800 12.5px "Fredoka", "PingFang SC", sans-serif';
-        ctx.textAlign = 'left';
-        ctx.textBaseline = 'middle';
-        ctx.fillText(bTxt, mr.left + 12, mr.top + mr.height * 0.5);
-
-        if (layoutCache.modeBannerProg && layoutCache.modeBannerProg.width > 0) {
-          const pr = layoutCache.modeBannerProg;
-          ctx.beginPath(); ctx.roundRect(pr.left, pr.top, pr.width, pr.height, 10);
-          ctx.fillStyle = '#d48c28'; ctx.fill();
-          ctx.fillStyle = '#ffffff'; ctx.font = '800 11px "Fredoka", "PingFang SC", sans-serif';
-          ctx.textAlign = 'center';
-          ctx.fillText(bProg, pr.left + pr.width * 0.5, pr.top + pr.height * 0.5);
-        }
-
-        if (remainingMoves !== null && layoutCache.movesCounterPill && layoutCache.movesCounterPill.width > 0) {
-          const mpr = layoutCache.movesCounterPill;
-          const isDanger = remainingMoves <= 5;
-          ctx.beginPath(); ctx.roundRect(mpr.left, mpr.top, mpr.width, mpr.height, 14);
-          ctx.fillStyle = isDanger ? '#ef4444' : '#f57c00'; ctx.fill();
-          ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 1.6; ctx.stroke();
-          ctx.fillStyle = '#ffffff'; ctx.font = '900 12px "Fredoka", "PingFang SC", sans-serif';
-          ctx.textAlign = 'center';
-          ctx.fillText(`⏰ 步数 ${remainingMoves}`, mpr.left + mpr.width * 0.5, mpr.top + mpr.height * 0.5);
-        }
-        ctx.restore();
-      }
-
-      // 5. 中央水瓶舞台（支持多瓶连续并行倾倒与并行飞入礼袋！）
-      const activePoursObj = window._activeCanvasPours || {};
-      const activePourList = Object.values(activePoursObj).filter(p => p && p.active);
-      const activeFlyBagsObj = window._activeCanvasFlyBags || {};
-      const sloshMap = window._canvasSloshMap || {};
-      const vfxMap = window._canvasVfxMap || {};
-
-      const findPourAsSrc = (bIdx) => activePourList.find(p => p.srcIdx === bIdx) || null;
-      const findPourAsDst = (bIdx) => activePourList.find(p => p.dstIdx === bIdx && p.dstLiqOpts) || null;
-
-      if (layoutCache.bottleSlots.length === bottles.length) {
-        // 5A. 绘制所有 3D 粗麻布编织软垫底座
-        bottles.forEach((b, idx) => {
-          if (!b || b.removed) return;
-          const slotInfo = layoutCache.bottleSlots[idx];
-          if (!slotInfo || !slotInfo.padRect) return;
-          const padRect = slotInfo.padRect;
-
-          const vs = bottleVisualState[idx] || (bottleVisualState[idx] = { liftY: 0, scale: 1, aoScale: 1, aoAlpha: 0.72 });
-          const pSrc = findPourAsSrc(idx);
-          const fBag = activeFlyBagsObj[idx];
-          const isPouringSrc = !!pSrc;
-          const isFlying = !!(fBag && fBag.active);
-          const isSelected = (!isPouringSrc && !isFlying) && ((selectedIndex === idx) || !!(activeHintPair && activeHintPair.srcIdx === idx));
-
-          if (isPouringSrc || isFlying) {
-            vs.liftY = 0;
-            vs.scale = 1.0;
-          } else {
-            const targetLiftY = isSelected ? -20 : 0;
-            const targetScale = isSelected ? 1.03 : 1.0;
-            vs.liftY += (targetLiftY - vs.liftY) * 0.26;
-            if (Math.abs(targetLiftY - vs.liftY) < 0.08) vs.liftY = targetLiftY;
-            vs.scale += (targetScale - vs.scale) * 0.26;
-            if (Math.abs(targetScale - vs.scale) < 0.002) vs.scale = targetScale;
-          }
-
-          const targetAoScale = (isSelected || isPouringSrc || isFlying) ? 0.56 : 1.0;
-          const targetAoAlpha = (isSelected || isPouringSrc || isFlying) ? 0.22 : 0.72;
-          vs.aoScale += (targetAoScale - vs.aoScale) * 0.24;
-          vs.aoAlpha += (targetAoAlpha - vs.aoAlpha) * 0.24;
-
-          const cCan = getNativeCoasterCanvas(b);
-          ctx.drawImage(cCan, padRect.left, padRect.top, padRect.width, padRect.height);
-
-          const aoCx = padRect.left + padRect.width * 0.50;
-          const aoCy = padRect.top + padRect.height * (18.5 / 46.0);
-          const aoRx = padRect.width * (28 / 100) * vs.aoScale;
-          const aoRy = padRect.height * (6.2 / 46) * vs.aoScale;
-          const aoSp = getAoShadowSprite();
-          if (aoSp && aoRx > 0.5 && aoRy > 0.5) {
-            ctx.save();
-            ctx.globalAlpha = Math.max(0, Math.min(1, vs.aoAlpha / 0.72));
-            ctx.drawImage(aoSp, aoCx - aoRx, aoCy - aoRy, aoRx * 2, aoRy * 2);
-            ctx.restore();
-          }
-        });
-
-        // 5B. 按 Z 序绘制所有水瓶
-        const drawOrder = bottles.map((_, i) => i).sort((a, bIdx) => {
-          const zOf = (i) => {
-            if (activeFlyBagsObj[i] && activeFlyBagsObj[i].active) return 120;
-            if (findPourAsSrc(i)) return 100;
-            if (findPourAsDst(i)) return 85;
-            if (selectedIndex === i || (activeHintPair && activeHintPair.srcIdx === i)) return 65;
-            if (activeHintPair && activeHintPair.dstIdx === i) return 60;
-            if (bottles[i] && bottles[i].isGiantCat) return 30;
-            return 20;
-          };
-          return zOf(a) - zOf(bIdx);
-        });
-
-        drawOrder.forEach(idx => {
-          const b = bottles[idx];
-          if (!b || b.removed) return;
-          const slotInfo = layoutCache.bottleSlots[idx];
-          if (!slotInfo || !slotInfo.slotRect) return;
-          const slotRect = slotInfo.slotRect;
-          const rejectInfo = uiState.bottleRejectMap[idx];
-
-          registerHitRegion('bottle_' + idx, slotRect.left - 3, slotRect.top - 16, slotRect.width + 6, slotRect.height + 22, 40, () => onBottleClick(idx));
-
-          const vs = bottleVisualState[idx] || { liftY: 0, scale: 1 };
-          const maxCap = b.maxCap || 4;
-          const isGiantCat = !!b.isGiantCat;
-          const { vbMinX, vbMinY, vbW, vbH } = getBottleLayerMetrics(maxCap, isGiantCat);
-
-          const pSrc = findPourAsSrc(idx);
-          const pDst = findPourAsDst(idx);
-          const flyState = activeFlyBagsObj[idx];
-          const isPouringSrc = !!pSrc;
-          const isPouringDst = !!pDst;
-          const isFlyingBag = !!(flyState && flyState.active);
-
+        // 3. 顶部栏（100% 原生 Canvas 烘焙超椭圆折射玻璃按钮）
+        if (layoutCache.settingsBtn) {
+          const r = layoutCache.settingsBtn;
+          const sp = getNativeGlassButtonSprite('settings-btn');
+          const pressS = pressedHitId === 'settings-btn' ? 0.93 : 1.0;
           ctx.save();
-
-          if (isFlyingBag) {
-            if (flyState.clipBottomY !== null) {
-              ctx.beginPath();
-              ctx.rect(0, 0, viewW, flyState.clipBottomY);
-              ctx.clip();
-            }
-            const cx = slotRect.left + slotRect.width * 0.5 + flyState.tx;
-            const cy = slotRect.top + slotRect.height * 0.5 + flyState.ty;
-            ctx.translate(cx, cy);
-            ctx.rotate((flyState.curRot * Math.PI) / 180);
-            ctx.scale(flyState.curScale, flyState.curScale);
-            ctx.translate(-slotRect.width * 0.5, -slotRect.height * 0.5);
-            ctx.scale(slotRect.width / vbW, slotRect.height / vbH);
-            ctx.translate(-vbMinX, -vbMinY);
-          } else if (isPouringSrc) {
-            ctx.translate(pSrc.curLipX, pSrc.curLipY);
-            ctx.rotate((pSrc.curDeg * Math.PI) / 180);
-            ctx.scale(slotRect.width / vbW, slotRect.height / vbH);
-            ctx.translate(-pSrc.pivotSvgX, -pSrc.pivotSvgY);
-          } else {
-            const pivotScreenX = slotRect.left + slotRect.width * 0.5;
-            const pivotScreenY = slotRect.top + slotRect.height * 0.92;
-            let shakeX = 0, shakeRad = 0;
-            if (rejectInfo && nowMs < rejectInfo.shakeUntil) {
-              shakeX = Math.sin(nowMs * 0.048) * 4.8;
-              shakeRad = (shakeX * 0.55 * Math.PI) / 180;
-            } else if (vfxMap[idx] && vfxMap[idx].p < 0.48 && ['ice_shatter', 'ice_crack', 'stone_shatter', 'stone_hit'].includes(vfxMap[idx].vfxType)) {
-              const vp = vfxMap[idx].p;
-              shakeX = Math.sin(vp * Math.PI * 10) * (1 - vp * 2) * 5.2;
-              shakeRad = (shakeX * 0.45 * Math.PI) / 180;
-            }
-            let corkScaleX = 1, corkScaleY = 1, corkTransY = 0;
-            if (b.corked && typeof b.corkAnimProgress === 'number' && b.corkAnimProgress >= 0.16 && b.corkAnimProgress < 0.42) {
-              const hitP = (b.corkAnimProgress - 0.16) / 0.26;
-              const squash = Math.sin(hitP * Math.PI) * Math.exp(-2.2 * hitP);
-              corkScaleX = 1 + squash * 0.024;
-              corkScaleY = 1 - squash * 0.030;
-              corkTransY = squash * 2.8;
-            }
-            ctx.translate(pivotScreenX + shakeX, pivotScreenY + vs.liftY + corkTransY);
-            ctx.rotate(shakeRad);
-            ctx.scale(vs.scale * corkScaleX, vs.scale * corkScaleY);
-            ctx.translate(-pivotScreenX, -pivotScreenY);
-
-            ctx.translate(slotRect.left, slotRect.top);
-            ctx.scale(slotRect.width / vbW, slotRect.height / vbH);
-            ctx.translate(-vbMinX, -vbMinY);
-          }
-
-          let layersToDraw = b.layers;
-          let liqOpts = {
-            layers: b.layers,
-            topLayerScale: 1,
-            tiltAngle: 0,
-            mysteryCount: b.mysteryCount || 0,
-            maxCap,
-            isGiantCat,
-            sloshPhase: (sloshMap[idx] && sloshMap[idx].sloshPhase) || 0,
-            sloshAmplitude: (sloshMap[idx] && sloshMap[idx].sloshAmplitude) || 0
-          };
-          if (isPouringSrc && pSrc.srcLiqOpts) {
-            layersToDraw = pSrc.srcLayers;
-            liqOpts = Object.assign({ layers: layersToDraw }, pSrc.srcLiqOpts);
-          } else if (isPouringDst && pDst.dstLiqOpts) {
-            layersToDraw = pDst.dstLayers;
-            liqOpts = Object.assign({ layers: layersToDraw }, pDst.dstLiqOpts);
-          }
-
-          drawSingleBottleContents(ctx, b, idx, maxCap, isGiantCat, vbMinX, vbMinY, vbW, vbH, liqOpts, isPouringSrc, isPouringDst);
+          ctx.translate(r.left + r.width * 0.5, r.top + r.height * 0.5);
+          ctx.scale(pressS, pressS);
+          ctx.drawImage(sp, -r.width * 0.5, -r.height * 0.5, r.width, r.height);
           ctx.restore();
+          registerHitRegion('settings-btn', r.left, r.top, r.width, r.height, 30, () => {
+            uiState.openModalId = 'pause-modal-mask';
+            playSound('modal_open');
+          });
+        }
 
-          // (A) 选中提起水瓶时的柔和金辉光环与 6 颗上浮星芒微粒
-          if (selectedIndex === idx && !isPouringSrc && !isFlyingBag) {
-            const topColKey = b.layers && b.layers.length > 0 ? b.layers[b.layers.length - 1] : 'yellow';
-            const sCol = COLORS[topColKey] || COLORS.yellow;
-            ctx.save();
-            const scx = slotRect.left + slotRect.width * 0.5;
-            const pulse = 0.75 + 0.25 * Math.sin(nowMs * 0.006);
-            ctx.strokeStyle = sCol.topLight || '#fef08a';
-            ctx.globalAlpha = 0.55 * pulse;
-            ctx.lineWidth = 2.2;
-            ctx.beginPath();
-            ctx.ellipse(scx, slotRect.bottom - 6 + vs.liftY, slotRect.width * 0.44, 7.5, 0, 0, Math.PI * 2);
-            ctx.stroke();
-            for (let sp = 0; sp < 6; sp++) {
-              const phase = ((nowMs * 0.0014 + sp * 0.17) % 1.0);
-              const ang = sp * 1.05 + nowMs * 0.002;
-              const px = scx + Math.cos(ang) * (slotRect.width * 0.44);
-              const py = slotRect.bottom - 14 + vs.liftY - phase * (slotRect.height * 0.78);
-              drawGlowingStar2D(ctx, px, py, (2.2 + (sp % 2) * 0.9) * Math.sin(phase * Math.PI), ang, 0.82 * Math.sin(phase * Math.PI));
-            }
-            ctx.restore();
+        if (layoutCache.rulesBtn) {
+          const r = layoutCache.rulesBtn;
+          const sp = getNativeGlassButtonSprite('rules-help-btn');
+          const pressS = pressedHitId === 'rules-help-btn' ? 0.93 : 1.0;
+          ctx.save();
+          ctx.translate(r.left + r.width * 0.5, r.top + r.height * 0.5);
+          ctx.scale(pressS, pressS);
+          ctx.drawImage(sp, -r.width * 0.5, -r.height * 0.5, r.width, r.height);
+          ctx.restore();
+          registerHitRegion('rules-help-btn', r.left, r.top, r.width, r.height, 30, () => {
+            openRulesHelpModal();
+          });
+        }
+
+        if (layoutCache.centerLvTrigger) {
+          const r = layoutCache.centerLvTrigger;
+          const cx = r.left + r.width * 0.5;
+          const cy = r.top + r.height * 0.5 - 5;
+          ctx.save();
+          ctx.font = `800 ${Math.min(32, Math.max(25, Math.round(viewH * 0.039)))}px "Fredoka", "Quicksand", "PingFang SC", "Microsoft YaHei", sans-serif`;
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillStyle = 'rgba(110, 68, 14, 0.36)';
+          ctx.fillText(`第 ${currentLevelId} 关`, cx, cy + 2.5);
+          ctx.fillStyle = '#ffffff';
+          ctx.fillText(`第 ${currentLevelId} 关`, cx, cy);
+
+          let goalTxt = '';
+          const targetTotal = Math.max(1, levelTargetTotalBottles || 4);
+          const catB = bottles.find(b => b && !b.removed && b.isGiantCat);
+          if (catB) {
+            goalTxt = `🐱 目标：灵猫收集 ${catB.layers.length}/${catB.maxCap || 8}`;
+          } else if (cfg.hasBags && bags && bags.length > 0) {
+            goalTxt = `🛍️ 目标：礼袋打包 ${Math.min(packedTotal, targetTotal)}/${targetTotal}`;
+          } else {
+            const corkedNow = bottles.filter(b => b && b.corked).length;
+            goalTxt = `🍾 目标：同色封存 ${Math.min(corkedNow, targetTotal)}/${targetTotal} 瓶`;
           }
-
-          // (B) 满瓶飞向礼袋时的流光尾迹、拖尾星芒粒子与袋口金环特效
-          if (isFlyingBag && flyState) {
-            const fcx = slotRect.left + slotRect.width * 0.5 + flyState.tx;
-            const fcy = slotRect.top + slotRect.height * 0.5 + flyState.ty;
-            ctx.save();
-            if (flyState.trail && flyState.trail.length > 0) {
-              for (let tr = 0; tr < flyState.trail.length; tr++) {
-                const pt = flyState.trail[tr];
-                if (pt.alpha <= 0.05) continue;
-                drawGlowingStar2D(ctx, pt.x + (tr % 2 === 0 ? 6 : -6), pt.y, (1.8 + tr * 0.25) * pt.scale, nowMs * 0.005 + tr, pt.alpha * 0.85);
-              }
-            } else {
-              for (let tr = 1; tr <= 5; tr++) {
-                const ratio = 1 - tr * 0.13;
-                const tx = slotRect.left + slotRect.width * 0.5 + flyState.tx * ratio;
-                const ty = slotRect.top + slotRect.height * 0.5 + flyState.ty * ratio;
-                drawGlowingStar2D(ctx, tx + (tr % 2 === 0 ? 8 : -8), ty, 3.8 - tr * 0.55, nowMs * 0.005 + tr, 0.78 - tr * 0.13);
-              }
-            }
-            ctx.strokeStyle = 'rgba(254, 240, 138, 0.88)';
-            ctx.lineWidth = 2.4;
-            ctx.beginPath();
-            ctx.arc(fcx, fcy, slotRect.width * 0.36 * flyState.curScale, 0, Math.PI * 2);
-            ctx.stroke();
-            ctx.restore();
+          if (remainingMoves !== null) {
+            goalTxt += ` · 剩 ${remainingMoves} 步`;
           }
+          ctx.font = '800 11px "Fredoka", "PingFang SC", sans-serif';
+          const gw = Math.max(128, ctx.measureText(goalTxt).width + 22);
+          const gh = 19;
+          const gy = cy + 21;
+          ctx.beginPath();
+          ctx.roundRect(cx - gw * 0.5, gy - gh * 0.5, gw, gh, gh * 0.5);
+          ctx.fillStyle = (remainingMoves !== null && remainingMoves <= 5) ? 'rgba(220, 38, 38, 0.86)' : 'rgba(92, 54, 12, 0.42)';
+          ctx.fill();
+          ctx.strokeStyle = 'rgba(255, 248, 220, 0.72)';
+          ctx.lineWidth = 1.2;
+          ctx.stroke();
+          ctx.fillStyle = '#fffbeb';
+          ctx.fillText(goalTxt, cx, gy + 0.5);
+          ctx.restore();
+          registerHitRegion('top-center-level-trigger', r.left - 24, r.top - 6, r.width + 48, r.height + 24, 30, () => {
+            openLevelSelector();
+          });
+        }
 
-          // (C) 当玩家已拿起一个源水瓶时，在色锁瓶/单向瓶上方给出直观的【✓可倒入 / ✕限制原因】预反馈
-          if (selectedIndex !== null && selectedIndex !== idx && !b.corked && !b.removed && !isPouringSrc && !isPouringDst) {
-            const srcB = bottles[selectedIndex];
-            if (srcB && srcB.layers && srcB.layers.length > 0) {
-              const srcTopCol = srcB.layers[srcB.layers.length - 1];
-              let feedbackTxt = '';
-              let feedbackBg = '';
-              if (b.special === 'color_lock' && b.requiredColor) {
-                if (srcTopCol !== b.requiredColor) {
-                  const reqName = (COLORS[b.requiredColor]?.name || '同色').slice(0, 1);
-                  feedbackTxt = `✕ 仅限${reqName}色`;
-                  feedbackBg = 'rgba(220, 38, 38, 0.92)';
-                } else if (b.layers.length < maxCap && (b.layers.length === 0 || b.layers[b.layers.length - 1] === srcTopCol)) {
-                  feedbackTxt = '✓ 可倒入';
-                  feedbackBg = 'rgba(22, 163, 74, 0.92)';
-                }
-              } else if (b.special === 'one_way_out') {
-                feedbackTxt = '✕ 只出不进';
-                feedbackBg = 'rgba(220, 38, 38, 0.90)';
-              } else if (b.special === 'one_way_in' && b.layers.length < maxCap) {
-                if (b.layers.length === 0 || b.layers[b.layers.length - 1] === srcTopCol) {
-                  feedbackTxt = '✓ 单向可入';
-                  feedbackBg = 'rgba(22, 163, 74, 0.92)';
-                } else {
-                  feedbackTxt = '✕ 颜色不符';
-                  feedbackBg = 'rgba(220, 38, 38, 0.90)';
+        // 4. 顶部 4 个 3D 高定礼盒袋（含装瓶回弹、服务金铃叮当、极速拎走与新袋落下动画）
+        if (cfg.hasBags && layoutCache.bagRects.length > 0) {
+          const bagAnimMap = window._canvasBagAnimMap || {};
+          bags.forEach((bag, bIdx) => {
+            if (!bag || bag.removed) return;
+            const r = layoutCache.bagRects[bIdx];
+            if (!r) return;
+            const bagCan = getNativeBagCanvas(bag, bIdx);
+            if (bagCan) {
+              const anim = bagAnimMap[bIdx];
+              ctx.save();
+              let drawAlpha = 1;
+              const cx = r.left + r.width * 0.5;
+              const by = r.bottom;
+              if (anim) {
+                const p = Math.max(0, Math.min(1, (nowMs - anim.startTime) / Math.max(1, anim.duration)));
+                if (anim.type === 'bounce') {
+                  const sx = p < 0.4 ? (1 + 0.12 * (p / 0.4)) : (1.12 - 0.12 * ((p - 0.4) / 0.6));
+                  const sy = p < 0.4 ? (1 - 0.10 * (p / 0.4)) : (0.90 + 0.10 * ((p - 0.4) / 0.6));
+                  ctx.translate(cx, by);
+                  ctx.scale(sx, sy);
+                  ctx.translate(-cx, -by);
+                } else if (anim.type === 'carry_away') {
+                  const liftY = -Math.pow(p, 1.45) * 125;
+                  const rot = Math.sin(p * Math.PI * 2) * 0.12;
+                  drawAlpha = Math.max(0, 1 - Math.pow(p, 1.3));
+                  ctx.translate(cx, r.top + r.height * 0.15 + liftY);
+                  ctx.rotate(rot);
+                  ctx.scale(1 - p * 0.12, 1 + p * 0.06);
+                  ctx.translate(-cx, -(r.top + r.height * 0.15));
+                } else if (anim.type === 'drop_in') {
+                  const easeOutBack = 1 + 1.8 * Math.pow(p - 1, 3) + 0.8 * Math.pow(p - 1, 2);
+                  const dropY = (1 - easeOutBack) * -68;
+                  drawAlpha = Math.min(1, p * 1.8);
+                  ctx.translate(0, dropY);
                 }
               }
-              if (feedbackTxt) {
+              ctx.globalAlpha = drawAlpha;
+              ctx.drawImage(bagCan, r.left, r.top, r.width, r.height);
+
+              // 若处于装瓶回弹阶段，在袋口上方绘制摇晃的 3D 金色服务铃铛
+              if (anim && anim.type === 'bounce') {
+                const p = Math.max(0, Math.min(1, (nowMs - anim.startTime) / Math.max(1, anim.duration)));
+                const bellRot = Math.sin(p * Math.PI * 5) * 0.35 * (1 - p * 0.5);
                 ctx.save();
-                const fcx = slotRect.left + slotRect.width * 0.5;
-                const fcy = slotRect.top - 8 + Math.sin(nowMs * 0.008) * 2;
-                ctx.font = '900 10px "Fredoka", "PingFang SC", sans-serif';
-                const fw = Math.max(54, ctx.measureText(feedbackTxt).width + 14);
-                const fh = 18;
+                ctx.translate(cx, r.top + 8);
+                ctx.rotate(bellRot);
+                ctx.fillStyle = '#facc15';
+                ctx.strokeStyle = '#b45309';
+                ctx.lineWidth = 1.5;
                 ctx.beginPath();
-                ctx.roundRect(fcx - fw * 0.5, fcy - fh * 0.5, fw, fh, 9);
-                ctx.fillStyle = feedbackBg;
+                ctx.arc(0, 0, 9, Math.PI, 0, false);
+                ctx.lineTo(11, 7);
+                ctx.lineTo(-11, 7);
+                ctx.closePath();
                 ctx.fill();
-                ctx.strokeStyle = '#ffffff';
-                ctx.lineWidth = 1.4;
                 ctx.stroke();
-                ctx.fillStyle = '#ffffff';
-                ctx.textAlign = 'center';
-                ctx.textBaseline = 'middle';
-                ctx.fillText(feedbackTxt, fcx, fcy + 0.5);
+                ctx.beginPath();
+                ctx.arc(0, 8.5, 2.8, 0, Math.PI * 2);
+                ctx.fillStyle = '#d97706';
+                ctx.fill();
                 ctx.restore();
               }
+              ctx.restore();
             }
-          }
+            registerHitRegion('bag_' + bIdx, r.left, r.top, r.width, r.height, 25, () => onBagClick(bIdx));
+          });
+        }
 
-          // (D) 受阻轻提示气泡 (纯内存状态驱动)
-          if (rejectInfo && nowMs < rejectInfo.until && rejectInfo.text) {
-            const txt = rejectInfo.text;
-            const cw = Math.max(88, txt.length * 14 + 24);
-            const ch = 28;
-            const cx = slotRect.left + slotRect.width * 0.5 - cw * 0.5;
-            const cy = slotRect.top - 26;
-            ctx.save();
-            ctx.beginPath();
-            ctx.roundRect(cx, cy, cw, ch, 14);
-            ctx.fillStyle = 'rgba(255, 250, 238, 0.96)';
-            ctx.fill();
-            ctx.strokeStyle = '#ffffff';
-            ctx.lineWidth = 1.6;
-            ctx.stroke();
-            ctx.fillStyle = '#5c3d18';
-            ctx.font = '900 13px "Fredoka", "PingFang SC", sans-serif';
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
-            ctx.fillText(txt, cx + cw * 0.5, cy + ch * 0.5);
-            ctx.restore();
-          }
-        });
-      }
-
-      // 6. 全屏倾倒水柱（支持多个水柱并行绘制）与提示弧线
-      if (activePourList.length > 0) {
-        activePourList.forEach(pItem => drawPourStreamAndTrailOnCanvas(ctx, pItem));
-      } else if (activeHintPair) {
-        drawHintGuideOnCanvas(ctx, nowMs);
-      }
-
-      // 7. 底部 5 枚超椭圆折射玻璃辅助道具按钮
-      const dockIds = ['dock-restart-btn', 'shuffle-btn', 'undo-btn', 'hint-btn', 'add-bottle-btn'];
-      const dockTitles = {
-        'dock-restart-btn': '重玩',
-        'shuffle-btn': '重排',
-        'undo-btn': '撤回',
-        'hint-btn': '提示',
-        'add-bottle-btn': '+空瓶'
-      };
-      dockIds.forEach(id => {
-        const info = layoutCache.dockBtns[id];
-        if (!info || !info.btn) return;
-        const r = info.btn;
-        const sp = getNativeGlassButtonSprite(id);
-        const pressS = pressedHitId === id ? 0.93 : 1.0;
-        const cx = r.left + r.width * 0.5;
-        ctx.save();
-        ctx.translate(cx, r.top + r.height * 0.5);
-        ctx.scale(pressS, pressS);
-        ctx.drawImage(sp, -r.width * 0.5, -r.height * 0.5, r.width, r.height);
-        ctx.restore();
-
-        if (info.badge) {
-          const br = info.badge;
-          const badgeTxt = id === 'shuffle-btn' ? (shuffleUses > 0 ? String(shuffleUses) : '+')
-            : (id === 'undo-btn' ? (undoUses > 0 ? String(undoUses) : '+')
-              : (id === 'hint-btn' ? (hintUses > 0 ? String(hintUses) : '+')
-                : ((typeof addBottleUses !== 'undefined' && addBottleUses > 0) ? String(addBottleUses) : '+')));
+        // 模式提示横幅
+        if (uiState.modeBannerShow && layoutCache.modeBanner) {
+          const mr = layoutCache.modeBanner;
           ctx.save();
           ctx.beginPath();
-          ctx.roundRect(br.left, br.top, br.width, br.height, br.height * 0.5);
-          const bg = ctx.createLinearGradient(br.left, br.top, br.right, br.bottom);
-          bg.addColorStop(0, 'rgba(255, 248, 215, 0.96)');
-          bg.addColorStop(1, 'rgba(235, 178, 62, 0.96)');
-          ctx.fillStyle = bg;
+          ctx.roundRect(mr.left, mr.top, mr.width, mr.height, 18);
+          ctx.fillStyle = 'rgba(235, 200, 140, 0.34)';
+          ctx.fill();
+          ctx.strokeStyle = 'rgba(255, 255, 255, 0.68)';
+          ctx.lineWidth = 1.5;
+          ctx.stroke();
+
+          const bTxt = uiState.modeBannerText || '';
+          const bProg = uiState.modeBannerProg || '';
+          ctx.fillStyle = '#ffffff';
+          ctx.font = '800 12.5px "Fredoka", "PingFang SC", sans-serif';
+          ctx.textAlign = 'left';
+          ctx.textBaseline = 'middle';
+          ctx.fillText(bTxt, mr.left + 12, mr.top + mr.height * 0.5);
+
+          if (layoutCache.modeBannerProg && layoutCache.modeBannerProg.width > 0) {
+            const pr = layoutCache.modeBannerProg;
+            ctx.beginPath(); ctx.roundRect(pr.left, pr.top, pr.width, pr.height, 10);
+            ctx.fillStyle = '#d48c28'; ctx.fill();
+            ctx.fillStyle = '#ffffff'; ctx.font = '800 11px "Fredoka", "PingFang SC", sans-serif';
+            ctx.textAlign = 'center';
+            ctx.fillText(bProg, pr.left + pr.width * 0.5, pr.top + pr.height * 0.5);
+          }
+
+          if (remainingMoves !== null && layoutCache.movesCounterPill && layoutCache.movesCounterPill.width > 0) {
+            const mpr = layoutCache.movesCounterPill;
+            const isDanger = remainingMoves <= 5;
+            ctx.beginPath(); ctx.roundRect(mpr.left, mpr.top, mpr.width, mpr.height, 14);
+            ctx.fillStyle = isDanger ? '#ef4444' : '#f57c00'; ctx.fill();
+            ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 1.6; ctx.stroke();
+            ctx.fillStyle = '#ffffff'; ctx.font = '900 12px "Fredoka", "PingFang SC", sans-serif';
+            ctx.textAlign = 'center';
+            ctx.fillText(`⏰ 步数 ${remainingMoves}`, mpr.left + mpr.width * 0.5, mpr.top + mpr.height * 0.5);
+          }
+          ctx.restore();
+        }
+
+        // 5. 中央水瓶舞台（支持多瓶连续并行倾倒与并行飞入礼袋！）
+        const activePoursObj = window._activeCanvasPours || {};
+        const activePourList = Object.values(activePoursObj).filter(p => p && p.active);
+        const activeFlyBagsObj = window._activeCanvasFlyBags || {};
+        const sloshMap = window._canvasSloshMap || {};
+        const vfxMap = window._canvasVfxMap || {};
+
+        const findPourAsSrc = (bIdx) => activePourList.find(p => p.srcIdx === bIdx) || null;
+        const findPourAsDst = (bIdx) => activePourList.find(p => p.dstIdx === bIdx && p.dstLiqOpts) || null;
+
+        if (layoutCache.bottleSlots.length === bottles.length) {
+          // 5A. 绘制所有 3D 粗麻布编织软垫底座
+          bottles.forEach((b, idx) => {
+            if (!b || b.removed) return;
+            const slotInfo = layoutCache.bottleSlots[idx];
+            if (!slotInfo || !slotInfo.padRect) return;
+            const padRect = slotInfo.padRect;
+
+            const vs = bottleVisualState[idx] || (bottleVisualState[idx] = { liftY: 0, scale: 1, aoScale: 1, aoAlpha: 0.72 });
+            const pSrc = findPourAsSrc(idx);
+            const fBag = activeFlyBagsObj[idx];
+            const isPouringSrc = !!pSrc;
+            const isFlying = !!(fBag && fBag.active);
+            const isSelected = (!isPouringSrc && !isFlying) && ((selectedIndex === idx) || !!(activeHintPair && activeHintPair.srcIdx === idx));
+
+            if (isPouringSrc || isFlying) {
+              vs.liftY = 0;
+              vs.scale = 1.0;
+            } else {
+              const targetLiftY = isSelected ? -20 : 0;
+              const targetScale = isSelected ? 1.03 : 1.0;
+              vs.liftY += (targetLiftY - vs.liftY) * 0.26;
+              if (Math.abs(targetLiftY - vs.liftY) < 0.08) vs.liftY = targetLiftY;
+              vs.scale += (targetScale - vs.scale) * 0.26;
+              if (Math.abs(targetScale - vs.scale) < 0.002) vs.scale = targetScale;
+            }
+
+            const targetAoScale = (isSelected || isPouringSrc || isFlying) ? 0.56 : 1.0;
+            const targetAoAlpha = (isSelected || isPouringSrc || isFlying) ? 0.22 : 0.72;
+            vs.aoScale += (targetAoScale - vs.aoScale) * 0.24;
+            vs.aoAlpha += (targetAoAlpha - vs.aoAlpha) * 0.24;
+
+            const cCan = getNativeCoasterCanvas(b);
+            ctx.drawImage(cCan, padRect.left, padRect.top, padRect.width, padRect.height);
+
+            const aoCx = padRect.left + padRect.width * 0.50;
+            const aoCy = padRect.top + padRect.height * (18.5 / 46.0);
+            const aoRx = padRect.width * (28 / 100) * vs.aoScale;
+            const aoRy = padRect.height * (6.2 / 46) * vs.aoScale;
+            const aoSp = getAoShadowSprite();
+            if (aoSp && aoRx > 0.5 && aoRy > 0.5) {
+              ctx.save();
+              ctx.globalAlpha = Math.max(0, Math.min(1, vs.aoAlpha / 0.72));
+              ctx.drawImage(aoSp, aoCx - aoRx, aoCy - aoRy, aoRx * 2, aoRy * 2);
+              ctx.restore();
+            }
+          });
+
+          // 5B. 按 Z 序绘制所有水瓶
+          const drawOrder = bottles.map((_, i) => i).sort((a, bIdx) => {
+            const zOf = (i) => {
+              if (activeFlyBagsObj[i] && activeFlyBagsObj[i].active) return 120;
+              if (findPourAsSrc(i)) return 100;
+              if (findPourAsDst(i)) return 85;
+              if (selectedIndex === i || (activeHintPair && activeHintPair.srcIdx === i)) return 65;
+              if (activeHintPair && activeHintPair.dstIdx === i) return 60;
+              if (bottles[i] && bottles[i].isGiantCat) return 30;
+              return 20;
+            };
+            return zOf(a) - zOf(bIdx);
+          });
+
+          drawOrder.forEach(idx => {
+            const b = bottles[idx];
+            if (!b || b.removed) return;
+            const slotInfo = layoutCache.bottleSlots[idx];
+            if (!slotInfo || !slotInfo.slotRect) return;
+            const slotRect = slotInfo.slotRect;
+            const rejectInfo = uiState.bottleRejectMap[idx];
+
+            registerHitRegion('bottle_' + idx, slotRect.left - 3, slotRect.top - 16, slotRect.width + 6, slotRect.height + 22, 40, () => onBottleClick(idx));
+
+            const vs = bottleVisualState[idx] || { liftY: 0, scale: 1 };
+            const maxCap = b.maxCap || 4;
+            const isGiantCat = !!b.isGiantCat;
+            const { vbMinX, vbMinY, vbW, vbH } = getBottleLayerMetrics(maxCap, isGiantCat);
+
+            const pSrc = findPourAsSrc(idx);
+            const pDst = findPourAsDst(idx);
+            const flyState = activeFlyBagsObj[idx];
+            const isPouringSrc = !!pSrc;
+            const isPouringDst = !!pDst;
+            const isFlyingBag = !!(flyState && flyState.active);
+
+            ctx.save();
+
+            if (isFlyingBag) {
+              if (flyState.clipBottomY !== null) {
+                ctx.beginPath();
+                ctx.rect(0, 0, viewW, flyState.clipBottomY);
+                ctx.clip();
+              }
+              const cx = slotRect.left + slotRect.width * 0.5 + flyState.tx;
+              const cy = slotRect.top + slotRect.height * 0.5 + flyState.ty;
+              ctx.translate(cx, cy);
+              ctx.rotate((flyState.curRot * Math.PI) / 180);
+              ctx.scale(flyState.curScale, flyState.curScale);
+              ctx.translate(-slotRect.width * 0.5, -slotRect.height * 0.5);
+              ctx.scale(slotRect.width / vbW, slotRect.height / vbH);
+              ctx.translate(-vbMinX, -vbMinY);
+            } else if (isPouringSrc) {
+              ctx.translate(pSrc.curLipX, pSrc.curLipY);
+              ctx.rotate((pSrc.curDeg * Math.PI) / 180);
+              ctx.scale(slotRect.width / vbW, slotRect.height / vbH);
+              ctx.translate(-pSrc.pivotSvgX, -pSrc.pivotSvgY);
+            } else {
+              const pivotScreenX = slotRect.left + slotRect.width * 0.5;
+              const pivotScreenY = slotRect.top + slotRect.height * 0.92;
+              let shakeX = 0, shakeRad = 0;
+              if (rejectInfo && nowMs < rejectInfo.shakeUntil) {
+                shakeX = Math.sin(nowMs * 0.048) * 4.8;
+                shakeRad = (shakeX * 0.55 * Math.PI) / 180;
+              } else if (vfxMap[idx] && vfxMap[idx].p < 0.48 && ['ice_shatter', 'ice_crack', 'stone_shatter', 'stone_hit'].includes(vfxMap[idx].vfxType)) {
+                const vp = vfxMap[idx].p;
+                shakeX = Math.sin(vp * Math.PI * 10) * (1 - vp * 2) * 5.2;
+                shakeRad = (shakeX * 0.45 * Math.PI) / 180;
+              }
+              let corkScaleX = 1, corkScaleY = 1, corkTransY = 0;
+              if (b.corked && typeof b.corkAnimProgress === 'number' && b.corkAnimProgress >= 0.16 && b.corkAnimProgress < 0.42) {
+                const hitP = (b.corkAnimProgress - 0.16) / 0.26;
+                const squash = Math.sin(hitP * Math.PI) * Math.exp(-2.2 * hitP);
+                corkScaleX = 1 + squash * 0.024;
+                corkScaleY = 1 - squash * 0.030;
+                corkTransY = squash * 2.8;
+              }
+              ctx.translate(pivotScreenX + shakeX, pivotScreenY + vs.liftY + corkTransY);
+              ctx.rotate(shakeRad);
+              ctx.scale(vs.scale * corkScaleX, vs.scale * corkScaleY);
+              ctx.translate(-pivotScreenX, -pivotScreenY);
+
+              ctx.translate(slotRect.left, slotRect.top);
+              ctx.scale(slotRect.width / vbW, slotRect.height / vbH);
+              ctx.translate(-vbMinX, -vbMinY);
+            }
+
+            let layersToDraw = b.layers;
+            let liqOpts = {
+              layers: b.layers,
+              topLayerScale: 1,
+              tiltAngle: 0,
+              mysteryCount: b.mysteryCount || 0,
+              maxCap,
+              isGiantCat,
+              sloshPhase: (sloshMap[idx] && sloshMap[idx].sloshPhase) || 0,
+              sloshAmplitude: (sloshMap[idx] && sloshMap[idx].sloshAmplitude) || 0
+            };
+            if (isPouringSrc && pSrc.srcLiqOpts) {
+              layersToDraw = pSrc.srcLayers;
+              liqOpts = Object.assign({ layers: layersToDraw }, pSrc.srcLiqOpts);
+            } else if (isPouringDst && pDst.dstLiqOpts) {
+              layersToDraw = pDst.dstLayers;
+              liqOpts = Object.assign({ layers: layersToDraw }, pDst.dstLiqOpts);
+            }
+
+            drawSingleBottleContents(ctx, b, idx, maxCap, isGiantCat, vbMinX, vbMinY, vbW, vbH, liqOpts, isPouringSrc, isPouringDst);
+            ctx.restore();
+
+            // (A) 选中提起水瓶时的柔和金辉光环与 6 颗上浮星芒微粒
+            if (selectedIndex === idx && !isPouringSrc && !isFlyingBag) {
+              const topColKey = b.layers && b.layers.length > 0 ? b.layers[b.layers.length - 1] : 'yellow';
+              const sCol = COLORS[topColKey] || COLORS.yellow;
+              ctx.save();
+              const scx = slotRect.left + slotRect.width * 0.5;
+              const pulse = 0.75 + 0.25 * Math.sin(nowMs * 0.006);
+              ctx.strokeStyle = sCol.topLight || '#fef08a';
+              ctx.globalAlpha = 0.55 * pulse;
+              ctx.lineWidth = 2.2;
+              ctx.beginPath();
+              ctx.ellipse(scx, slotRect.bottom - 6 + vs.liftY, slotRect.width * 0.44, 7.5, 0, 0, Math.PI * 2);
+              ctx.stroke();
+              for (let sp = 0; sp < 6; sp++) {
+                const phase = ((nowMs * 0.0014 + sp * 0.17) % 1.0);
+                const ang = sp * 1.05 + nowMs * 0.002;
+                const px = scx + Math.cos(ang) * (slotRect.width * 0.44);
+                const py = slotRect.bottom - 14 + vs.liftY - phase * (slotRect.height * 0.78);
+                drawGlowingStar2D(ctx, px, py, (2.2 + (sp % 2) * 0.9) * Math.sin(phase * Math.PI), ang, 0.82 * Math.sin(phase * Math.PI));
+              }
+              ctx.restore();
+            }
+
+            // (B) 满瓶飞向礼袋时的流光尾迹、拖尾星芒粒子与袋口金环特效
+            if (isFlyingBag && flyState) {
+              const fcx = slotRect.left + slotRect.width * 0.5 + flyState.tx;
+              const fcy = slotRect.top + slotRect.height * 0.5 + flyState.ty;
+              ctx.save();
+              if (flyState.trail && flyState.trail.length > 0) {
+                for (let tr = 0; tr < flyState.trail.length; tr++) {
+                  const pt = flyState.trail[tr];
+                  if (pt.alpha <= 0.05) continue;
+                  drawGlowingStar2D(ctx, pt.x + (tr % 2 === 0 ? 6 : -6), pt.y, (1.8 + tr * 0.25) * pt.scale, nowMs * 0.005 + tr, pt.alpha * 0.85);
+                }
+              } else {
+                for (let tr = 1; tr <= 5; tr++) {
+                  const ratio = 1 - tr * 0.13;
+                  const tx = slotRect.left + slotRect.width * 0.5 + flyState.tx * ratio;
+                  const ty = slotRect.top + slotRect.height * 0.5 + flyState.ty * ratio;
+                  drawGlowingStar2D(ctx, tx + (tr % 2 === 0 ? 8 : -8), ty, 3.8 - tr * 0.55, nowMs * 0.005 + tr, 0.78 - tr * 0.13);
+                }
+              }
+              ctx.strokeStyle = 'rgba(254, 240, 138, 0.88)';
+              ctx.lineWidth = 2.4;
+              ctx.beginPath();
+              ctx.arc(fcx, fcy, slotRect.width * 0.36 * flyState.curScale, 0, Math.PI * 2);
+              ctx.stroke();
+              ctx.restore();
+            }
+
+            // (C) 当玩家已拿起一个源水瓶时，在色锁瓶/单向瓶上方给出直观的【✓可倒入 / ✕限制原因】预反馈
+            if (selectedIndex !== null && selectedIndex !== idx && !b.corked && !b.removed && !isPouringSrc && !isPouringDst) {
+              const srcB = bottles[selectedIndex];
+              if (srcB && srcB.layers && srcB.layers.length > 0) {
+                const srcTopCol = srcB.layers[srcB.layers.length - 1];
+                let feedbackTxt = '';
+                let feedbackBg = '';
+                if (b.special === 'color_lock' && b.requiredColor) {
+                  if (srcTopCol !== b.requiredColor) {
+                    const reqName = (COLORS[b.requiredColor]?.name || '同色').slice(0, 1);
+                    feedbackTxt = `✕ 仅限${reqName}色`;
+                    feedbackBg = 'rgba(220, 38, 38, 0.92)';
+                  } else if (b.layers.length < maxCap && (b.layers.length === 0 || b.layers[b.layers.length - 1] === srcTopCol)) {
+                    feedbackTxt = '✓ 可倒入';
+                    feedbackBg = 'rgba(22, 163, 74, 0.92)';
+                  }
+                } else if (b.special === 'one_way_out') {
+                  feedbackTxt = '✕ 只出不进';
+                  feedbackBg = 'rgba(220, 38, 38, 0.90)';
+                } else if (b.special === 'one_way_in' && b.layers.length < maxCap) {
+                  if (b.layers.length === 0 || b.layers[b.layers.length - 1] === srcTopCol) {
+                    feedbackTxt = '✓ 单向可入';
+                    feedbackBg = 'rgba(22, 163, 74, 0.92)';
+                  } else {
+                    feedbackTxt = '✕ 颜色不符';
+                    feedbackBg = 'rgba(220, 38, 38, 0.90)';
+                  }
+                }
+                if (feedbackTxt) {
+                  ctx.save();
+                  const fcx = slotRect.left + slotRect.width * 0.5;
+                  const fcy = slotRect.top - 8 + Math.sin(nowMs * 0.008) * 2;
+                  ctx.font = '900 10px "Fredoka", "PingFang SC", sans-serif';
+                  const fw = Math.max(54, ctx.measureText(feedbackTxt).width + 14);
+                  const fh = 18;
+                  ctx.beginPath();
+                  ctx.roundRect(fcx - fw * 0.5, fcy - fh * 0.5, fw, fh, 9);
+                  ctx.fillStyle = feedbackBg;
+                  ctx.fill();
+                  ctx.strokeStyle = '#ffffff';
+                  ctx.lineWidth = 1.4;
+                  ctx.stroke();
+                  ctx.fillStyle = '#ffffff';
+                  ctx.textAlign = 'center';
+                  ctx.textBaseline = 'middle';
+                  ctx.fillText(feedbackTxt, fcx, fcy + 0.5);
+                  ctx.restore();
+                }
+              }
+            }
+
+            // (D) 受阻轻提示气泡 (纯内存状态驱动)
+            if (rejectInfo && nowMs < rejectInfo.until && rejectInfo.text) {
+              const txt = rejectInfo.text;
+              const cw = Math.max(88, txt.length * 14 + 24);
+              const ch = 28;
+              const cx = slotRect.left + slotRect.width * 0.5 - cw * 0.5;
+              const cy = slotRect.top - 26;
+              ctx.save();
+              ctx.beginPath();
+              ctx.roundRect(cx, cy, cw, ch, 14);
+              ctx.fillStyle = 'rgba(255, 250, 238, 0.96)';
+              ctx.fill();
+              ctx.strokeStyle = '#ffffff';
+              ctx.lineWidth = 1.6;
+              ctx.stroke();
+              ctx.fillStyle = '#5c3d18';
+              ctx.font = '900 13px "Fredoka", "PingFang SC", sans-serif';
+              ctx.textAlign = 'center';
+              ctx.textBaseline = 'middle';
+              ctx.fillText(txt, cx + cw * 0.5, cy + ch * 0.5);
+              ctx.restore();
+            }
+          });
+        }
+
+        // 6. 全屏倾倒水柱（支持多个水柱并行绘制）与提示弧线
+        if (activePourList.length > 0) {
+          activePourList.forEach(pItem => drawPourStreamAndTrailOnCanvas(ctx, pItem));
+        } else if (activeHintPair) {
+          drawHintGuideOnCanvas(ctx, nowMs);
+        }
+
+        // 7. 底部 3 枚超椭圆折射玻璃辅助道具按钮（重排、撤回、提示）
+        const dockIds = ['shuffle-btn', 'undo-btn', 'hint-btn'];
+        const dockTitles = {
+          'shuffle-btn': '重排',
+          'undo-btn': '撤回',
+          'hint-btn': '提示'
+        };
+        dockIds.forEach(id => {
+          const info = layoutCache.dockBtns[id];
+          if (!info || !info.btn) return;
+          const r = info.btn;
+          const sp = getNativeGlassButtonSprite(id);
+          const pressS = pressedHitId === id ? 0.93 : 1.0;
+          const cx = r.left + r.width * 0.5;
+          ctx.save();
+          ctx.translate(cx, r.top + r.height * 0.5);
+          ctx.scale(pressS, pressS);
+          ctx.drawImage(sp, -r.width * 0.5, -r.height * 0.5, r.width, r.height);
+          ctx.restore();
+
+          if (info.badge) {
+            const br = info.badge;
+            const badgeTxt = id === 'shuffle-btn' ? (shuffleUses > 0 ? String(shuffleUses) : '+')
+              : (id === 'undo-btn' ? (undoUses > 0 ? String(undoUses) : '+')
+                : (id === 'hint-btn' ? (hintUses > 0 ? String(hintUses) : '+')
+                  : ((typeof addBottleUses !== 'undefined' && addBottleUses > 0) ? String(addBottleUses) : '+')));
+            ctx.save();
+            ctx.beginPath();
+            ctx.roundRect(br.left, br.top, br.width, br.height, br.height * 0.5);
+            const bg = ctx.createLinearGradient(br.left, br.top, br.right, br.bottom);
+            bg.addColorStop(0, 'rgba(255, 248, 215, 0.96)');
+            bg.addColorStop(1, 'rgba(235, 178, 62, 0.96)');
+            ctx.fillStyle = bg;
+            ctx.fill();
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.92)';
+            ctx.lineWidth = 1.4;
+            ctx.stroke();
+            ctx.fillStyle = '#5a3812';
+            ctx.font = '800 10.5px "Fredoka", "PingFang SC", sans-serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(badgeTxt, br.left + br.width * 0.5, br.top + br.height * 0.5);
+            ctx.restore();
+          }
+
+          const titleTxt = dockTitles[id];
+          if (titleTxt) {
+            ctx.save();
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.font = '900 12px "Fredoka", "PingFang SC", sans-serif';
+            ctx.fillStyle = 'rgba(72, 42, 8, 0.55)';
+            ctx.fillText(titleTxt, cx, r.bottom + 9.5);
+            ctx.fillStyle = '#ffffff';
+            ctx.fillText(titleTxt, cx, r.bottom + 8.5);
+            ctx.restore();
+          }
+
+          registerHitRegion(id, r.left - 3, r.top - 3, r.width + 6, r.height + 20, 45, () => executeDockAction(id));
+        });
+
+        // 8. 弹窗面板
+        drawOpenModalOnCanvas(ctx, viewW, viewH, nowMs);
+
+        // 9. 顶部轻提示胶囊 (纯内存状态驱动)
+        if (uiState.toastVisible && uiState.toastText) {
+          const txt = uiState.toastText;
+          ctx.save();
+          ctx.font = '800 13px "Fredoka", "PingFang SC", sans-serif';
+          const tw = Math.min(viewW * 0.9, ctx.measureText(txt).width + 52);
+          const th = 36;
+          const tx = (viewW - tw) * 0.5;
+          const ty = viewH * 0.145;
+          ctx.beginPath();
+          ctx.roundRect(tx, ty, tw, th, 18);
+          const tg = ctx.createLinearGradient(0, ty, 0, ty + th);
+          tg.addColorStop(0, 'rgba(255, 251, 240, 0.96)');
+          tg.addColorStop(1, 'rgba(244, 229, 200, 0.96)');
+          ctx.fillStyle = tg;
           ctx.fill();
           ctx.strokeStyle = 'rgba(255, 255, 255, 0.92)';
-          ctx.lineWidth = 1.4;
+          ctx.lineWidth = 1.5;
           ctx.stroke();
-          ctx.fillStyle = '#5a3812';
-          ctx.font = '800 10.5px "Fredoka", "PingFang SC", sans-serif';
-          ctx.textAlign = 'center';
+          ctx.beginPath();
+          ctx.arc(tx + 18, ty + th * 0.5, 9, 0, Math.PI * 2);
+          ctx.fillStyle = '#d97706';
+          ctx.fill();
+          ctx.fillStyle = '#5c3d18';
+          ctx.textAlign = 'left';
           ctx.textBaseline = 'middle';
-          ctx.fillText(badgeTxt, br.left + br.width * 0.5, br.top + br.height * 0.5);
+          ctx.fillText(txt, tx + 33, ty + th * 0.5, tw - 44);
           ctx.restore();
         }
-
-        const titleTxt = dockTitles[id];
-        if (titleTxt) {
-          ctx.save();
-          ctx.textAlign = 'center';
-          ctx.textBaseline = 'middle';
-          ctx.font = '900 12px "Fredoka", "PingFang SC", sans-serif';
-          ctx.fillStyle = 'rgba(72, 42, 8, 0.55)';
-          ctx.fillText(titleTxt, cx, r.bottom + 9.5);
-          ctx.fillStyle = '#ffffff';
-          ctx.fillText(titleTxt, cx, r.bottom + 8.5);
-          ctx.restore();
-        }
-
-        registerHitRegion(id, r.left - 3, r.top - 3, r.width + 6, r.height + 20, 45, () => executeDockAction(id));
-      });
-
-      // 8. 弹窗面板
-      drawOpenModalOnCanvas(ctx, viewW, viewH, nowMs);
-
-      // 9. 顶部轻提示胶囊 (纯内存状态驱动)
-      if (uiState.toastVisible && uiState.toastText) {
-        const txt = uiState.toastText;
-        ctx.save();
-        ctx.font = '800 13px "Fredoka", "PingFang SC", sans-serif';
-        const tw = Math.min(viewW * 0.9, ctx.measureText(txt).width + 52);
-        const th = 36;
-        const tx = (viewW - tw) * 0.5;
-        const ty = viewH * 0.145;
-        ctx.beginPath();
-        ctx.roundRect(tx, ty, tw, th, 18);
-        const tg = ctx.createLinearGradient(0, ty, 0, ty + th);
-        tg.addColorStop(0, 'rgba(255, 251, 240, 0.96)');
-        tg.addColorStop(1, 'rgba(244, 229, 200, 0.96)');
-        ctx.fillStyle = tg;
-        ctx.fill();
-        ctx.strokeStyle = 'rgba(255, 255, 255, 0.92)';
-        ctx.lineWidth = 1.5;
-        ctx.stroke();
-        ctx.beginPath();
-        ctx.arc(tx + 18, ty + th * 0.5, 9, 0, Math.PI * 2);
-        ctx.fillStyle = '#d97706';
-        ctx.fill();
-        ctx.fillStyle = '#5c3d18';
-        ctx.textAlign = 'left';
-        ctx.textBaseline = 'middle';
-        ctx.fillText(txt, tx + 33, ty + th * 0.5, tw - 44);
-        ctx.restore();
-      }
-      } catch ( loopErr ) {
+      } catch (loopErr) {
         if (typeof console !== 'undefined' && console.error && !_g.__loggedLoopErr) {
           _g.__loggedLoopErr = true;
           console.error('[PureCanvasLoop Error]', loopErr);
