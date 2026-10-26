@@ -1,0 +1,10 @@
+# WeChat Mini Game Helper
+.weixin-minigame-helper/
+
+# Dependencies
+node_modules/
+
+# OS Files
+Thumbs.db
+Desktop.ini
+.DS_Store
