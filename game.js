@@ -550,7 +550,7 @@ const __outerGlobalRef = (typeof globalThis !== 'undefined' && globalThis) ? glo
       safeSetProp(_g, 'localStorage', wxStore);
       return wxStore;
     }
-    if (_outerWin && _outerWin.localStorage) return _outerWin.localStorage;
+    try { if (_outerWin && _outerWin.localStorage) return _outerWin.localStorage; } catch (e) { }
     const mem = {};
     const fallbackStore = {
       getItem(k) { return Object.prototype.hasOwnProperty.call(mem, k) ? mem[k] : null; },
@@ -6110,7 +6110,7 @@ const __outerGlobalRef = (typeof globalThis !== 'undefined' && globalThis) ? glo
       ctx.restore();
     }
 
-    // ---------------- 5. 100% 实心高饱和 3D 圆柱体积药水绘制器（消除半透明重影与发白，立体感拉满！） ----------------
+    // ---------------- 5. 100% 实心高饱和 3D 圆柱体积药水绘制器（还原经典 3D 圆柱层间体积 + 顶层向上鼓起的水表面张力球冠！） ----------------
     function createCanvasLiquidGrad(ctx, gradId) {
       if (gradId === "liq-mystery") {
         const g = ctx.createLinearGradient(18, 0, 82, 0);
@@ -6123,7 +6123,7 @@ const __outerGlobalRef = (typeof globalThis !== 'undefined' && globalThis) ? glo
         return g;
       }
       if (gradId === "top-mystery") {
-        const g = ctx.createLinearGradient(18, -7, 82, 7);
+        const g = ctx.createLinearGradient(18, -9, 82, 5);
         g.addColorStop(0, "#64748b");
         g.addColorStop(0.5, "#334155");
         g.addColorStop(1, "#0f172a");
@@ -6133,12 +6133,12 @@ const __outerGlobalRef = (typeof globalThis !== 'undefined' && globalThis) ? glo
       const cKey = gradId.replace(/^(liq-|top-)/, "");
       const col = COLORS[cKey] || COLORS.blue;
       if (isTop) {
-        // 顶层液面 3D 立体椭圆光泽渐变（左前高光 -> 饱满中调 -> 右后深邃边沿）
-        const g = ctx.createLinearGradient(19, -5, 81, 6);
+        // 顶层向上凸出张力液面渐变（用于倾斜分支）
+        const g = ctx.createLinearGradient(19, -8, 81, 5);
         g.addColorStop(0.00, col.topLight);
-        g.addColorStop(0.32, col.topRim);
-        g.addColorStop(0.72, col.topMid);
-        g.addColorStop(1.00, col.left);
+        g.addColorStop(0.35, col.topRim);
+        g.addColorStop(0.75, col.topMid);
+        g.addColorStop(1.00, col.mid);
         return g;
       }
       // 5段式 3D 实心圆柱 Phong 光照着色渐变：左缘暗部 -> 左前饱满高光柱 -> 核心实心主色 -> 右侧立体背光暗部 -> 右缘菲涅尔反光
@@ -6196,11 +6196,11 @@ const __outerGlobalRef = (typeof globalThis !== 'undefined' && globalThis) ? glo
         let curY = bottomY;
         const sloshSin = Math.sin(sloshPhase);
         const sloshCos = Math.cos(sloshPhase * 1.35);
-        const topTiltY = sloshAmplitude * 6.5 * sloshSin;
-        const waveCrest = sloshAmplitude * 3.8 * sloshCos;
-        // 向上凸出的水表面张力拱高（正表面应力饱满上拱穹顶，告别向下凹陷感！）
-        const domeRy = Math.max(6.2, ry * 1.12 + sloshAmplitude * 1.5 * sloshCos);
+        const topTiltY = sloshAmplitude * 7.2 * sloshSin;
+        const waveCrest = sloshAmplitude * 4.2 * sloshCos;
+        const ryDynamic = ry + sloshAmplitude * 1.8 * sloshCos;
 
+        // 1. 逐层绘制实心 3D 圆柱体（完整保留经典的层间 3D 圆柱饱满贴合与内部左前高光柱，绝不破坏层间结构！）
         for (let i = 0; i < groups.length; i++) {
           const g = groups[i];
           const h = g.amount * layerH;
@@ -6215,80 +6215,63 @@ const __outerGlobalRef = (typeof globalThis !== 'undefined' && globalThis) ? glo
           const curTiltY = isTopGroup ? topTiltY : (topTiltY * 0.32 * ((i + 1) / groups.length));
           const curWave = isTopGroup ? waveCrest : (waveCrest * 0.25);
 
-          // 顶沿适当下移 2.5px 作为拱脚，使向上凸出的拱顶 (A rx,domeRy 0 0,1) 饱满拱起，充满表面张力！
-          const rimDrop = 2.4;
-          const yTL = yTop + rimDrop - curTiltY;
-          const yTR = yTop + rimDrop + curTiltY;
-          const yBL = (i === 0) ? yBotDraw : (yBotDraw + rimDrop - prevTiltY);
-          const yBR = (i === 0) ? yBotDraw : (yBotDraw + rimDrop + prevTiltY);
+          // 顶层左右壁边缘略微下收 2px 作为水表面张力球冠的起拱脚，使顶面中心明显【向上凸出】
+          const topWallDrop = isTopGroup ? 2.2 : 0;
+          const yTL = yTop + topWallDrop - curTiltY, yTR = yTop + topWallDrop + curTiltY;
+          const yBL = yBotDraw - prevTiltY, yBR = yBotDraw + prevTiltY;
 
           const colInfo = COLORS[g.colorKey] || COLORS.blue;
-          const curDomeRy = isTopGroup ? domeRy : (ry * 0.96);
-          const prevDomeRy = (i === 0) ? ry : (ry * 0.96);
+          const yTLFill = isTopGroup ? yTL : (yTL - 1.5);
+          const yTRFill = isTopGroup ? yTR : (yTR - 1.5);
 
-          // 关键几何改造：
-          // - 顶边从 leftX 到 rightX 采用 A rx,curDomeRy 0 0,1（在屏幕坐标系中顺时针经过上方顶点 y - curDomeRy，形成【向上凸出】的饱满张力弧面！）
-          // - 若 i === 0（最底层），底边贴合玻璃瓶底向下圆弧 (A rx,ry 0 0,1)；
-          // - 若 i > 0（上层药水），底边从 rightX 回到 leftX 采用 A rx,prevDomeRy 0 0,0（同样经过上方顶点，与下层向上凸出的顶面 100% 严丝合缝咬合！）
-          let topEdgeCmd = `A ${rx},${curDomeRy.toFixed(2)} 0 0,1 ${rightX},${yTR.toFixed(2)}`;
-          if (sloshAmplitude > 0.01 && isTopGroup) {
-            const apexY = yTop + rimDrop - curDomeRy * 1.25 - curWave;
-            topEdgeCmd = `C ${50 - rx * 0.48},${(apexY - curTiltY * 0.35).toFixed(2)} ${50 + rx * 0.48},${(apexY + curTiltY * 0.35).toFixed(2)} ${rightX},${yTR.toFixed(2)}`;
+          // 顶层的上边界直接采用向上饱满凸出的圆弧 (A rx,domeUpRy 0 0,1)，下层保持经典直线由上层底弧自然遮盖
+          const domeUpRy = Math.max(8.8, ryDynamic * 1.22);
+          let layerPath;
+          if (isTopGroup) {
+            if (sloshAmplitude > 0.01) {
+              layerPath = new Path2D(`M ${leftX},${yTLFill.toFixed(2)} C ${50 - rx * 0.45},${(yTop - domeUpRy * 1.15 - curTiltY * 0.3 + curWave).toFixed(2)} ${50 + rx * 0.45},${(yTop - domeUpRy * 1.15 + curTiltY * 0.3 - curWave).toFixed(2)} ${rightX},${yTRFill.toFixed(2)} L ${rightX},${yBR.toFixed(2)} A ${rx},${ry} 0 0,1 ${leftX},${yBL.toFixed(2)} Z`);
+            } else {
+              layerPath = new Path2D(`M ${leftX},${yTLFill.toFixed(2)} A ${rx},${domeUpRy.toFixed(2)} 0 0,1 ${rightX},${yTRFill.toFixed(2)} L ${rightX},${yBR.toFixed(2)} A ${rx},${ry} 0 0,1 ${leftX},${yBL.toFixed(2)} Z`);
+            }
+          } else {
+            layerPath = new Path2D(`M ${leftX},${yTLFill.toFixed(2)} L ${rightX},${yTRFill.toFixed(2)} L ${rightX},${yBR.toFixed(2)} A ${rx},${ry} 0 0,1 ${leftX},${yBL.toFixed(2)} Z`);
           }
-          const botEdgeCmd = (i === 0)
-            ? `A ${rx},${ry} 0 0,1 ${leftX},${yBL.toFixed(2)}`
-            : `A ${rx},${prevDomeRy.toFixed(2)} 0 0,0 ${leftX},${(yBL + 0.8).toFixed(2)}`;
-
-          const layerPath = new Path2D(`M ${leftX},${yTL.toFixed(2)} ${topEdgeCmd} L ${rightX},${(i === 0 ? yBR : yBR + 0.8).toFixed(2)} ${botEdgeCmd} Z`);
 
           ctx.save();
           ctx.globalAlpha = 1.0;
           ctx.fillStyle = createCanvasLiquidGrad(ctx, gradId);
           ctx.fill(layerPath);
 
+          // 液体圆柱内部左前侧 3D 柔和高光亮柱
           ctx.clip(layerPath);
-
-          // (1) 顶部向上凸起的表面张力水润渐变过渡层（与下方柱体自然融为一体，绝不产生下凹分界线！）
-          if (g.colorKey !== "mystery_dark") {
-            const crownApexY = yTop + rimDrop - curDomeRy;
-            const tensionG = ctx.createLinearGradient(0, crownApexY - 1, 0, yTop + rimDrop + (isTopGroup ? 16 : 9));
-            tensionG.addColorStop(0.00, colInfo.topLight);
-            tensionG.addColorStop(0.28, colInfo.topRim || colInfo.topMid);
-            tensionG.addColorStop(0.62, colInfo.topMid || colInfo.mid);
-            tensionG.addColorStop(1.00, "rgba(255, 255, 255, 0)");
-            ctx.fillStyle = tensionG;
-            ctx.fillRect(leftX - 2, crownApexY - 4, rx * 2 + 4, curDomeRy + (isTopGroup ? 20 : 12));
-          }
-
-          // (2) 液体圆柱内部左前侧 3D 柔和高光亮柱
-          const cylSpecG = ctx.createLinearGradient(24, 0, 39, 0);
+          const cylSpecG = ctx.createLinearGradient(25, 0, 39, 0);
           cylSpecG.addColorStop(0, "rgba(255, 255, 255, 0)");
-          cylSpecG.addColorStop(0.45, g.colorKey === "mystery_dark" ? "rgba(148, 163, 184, 0.16)" : "rgba(255, 255, 255, 0.24)");
+          cylSpecG.addColorStop(0.45, g.colorKey === "mystery_dark" ? "rgba(148, 163, 184, 0.16)" : "rgba(255, 255, 255, 0.22)");
           cylSpecG.addColorStop(1, "rgba(255, 255, 255, 0)");
           ctx.fillStyle = cylSpecG;
-          ctx.fillRect(24, yTop - curDomeRy - 2, 15, h + curDomeRy + 14);
+          ctx.fillRect(25, yTop - 12, 14, h + 20);
 
-          // (3) 每层底沿内部微暗体积压边
+          // 每层底沿内部微暗体积压边
           const botDepthG = ctx.createLinearGradient(0, yBotDraw - Math.min(12, h * 0.35), 0, yBotDraw + ry);
           botDepthG.addColorStop(0, "rgba(0, 0, 0, 0)");
-          botDepthG.addColorStop(1, "rgba(10, 15, 30, 0.20)");
+          botDepthG.addColorStop(1, "rgba(10, 15, 30, 0.22)");
           ctx.fillStyle = botDepthG;
           ctx.fillRect(leftX, yBotDraw - Math.min(12, h * 0.35), rx * 2, Math.min(12, h * 0.35) + ry + 2);
           ctx.restore();
 
-          // 分层交界处：沿着【向上凸起】的层间弧顶绘制高光张力棱线（PI*1.06 ~ PI*1.94 为上半圈向上拱弧！）
+          // 分层交界处：经典前壁单弧 3D 立体倒角亮边
           if (i > 0) {
             ctx.save();
             ctx.beginPath();
-            ctx.ellipse(50, yBotDraw + rimDrop + 0.6, rx - 0.6, prevDomeRy, 0, Math.PI * 1.05, Math.PI * 1.95, false);
-            ctx.strokeStyle = "rgba(15, 23, 42, 0.26)";
-            ctx.lineWidth = 1.4;
+            ctx.ellipse(50, yBotDraw + 0.8, rx - 0.5, ry, 0, 0.05 * Math.PI, 0.95 * Math.PI, false);
+            ctx.strokeStyle = "rgba(15, 23, 42, 0.32)";
+            ctx.lineWidth = 1.5;
             ctx.stroke();
 
             ctx.beginPath();
-            ctx.ellipse(50, yBotDraw + rimDrop - 0.5, rx - 0.8, prevDomeRy, 0, Math.PI * 1.07, Math.PI * 1.93, false);
+            ctx.ellipse(50, yBotDraw - 0.3, rx - 0.8, ry, 0, 0.06 * Math.PI, 0.94 * Math.PI, false);
             ctx.strokeStyle = g.colorKey === "mystery_dark" ? "rgba(148, 163, 184, 0.45)" : colInfo.topLight;
-            ctx.lineWidth = 1.4;
+            ctx.lineWidth = 1.35;
             ctx.stroke();
             ctx.restore();
           }
@@ -6300,7 +6283,7 @@ const __outerGlobalRef = (typeof globalThis !== 'undefined' && globalThis) ? glo
           ctx.textAlign = "center";
           ctx.textBaseline = "middle";
           for (let m = 0; m < Math.min(mysteryCount, layers.length); m++) {
-            const qCenterY = bottomY - (m + 0.5) * layerH + ry * 0.25;
+            const qCenterY = bottomY - (m + 0.5) * layerH + ry * 0.45;
             ctx.strokeStyle = "rgba(9, 15, 29, 0.75)";
             ctx.lineWidth = 3.2;
             ctx.strokeText("?", 50, qCenterY);
@@ -6310,47 +6293,76 @@ const __outerGlobalRef = (typeof globalThis !== 'undefined' && globalThis) ? glo
           ctx.restore();
         }
 
-        // 顶层液面：强化【向上凸出】的水表面张力弯月高光冠（绝不画向下凹的亮线！）
+        // 2. 顶层【向上凸出】的水表面张力球冠（上半弧高高隆起 ryUp=9.6，下半弧微拱或平缓过渡，绝不产生向下凹陷的深 U 槽！）
         const topColorKey = groups[groups.length - 1].colorKey;
-        const colTop = COLORS[topColorKey] || { topLight: "#7a96ff", topRim: "#5b7cfa", topMid: "#3b5bdb", left: "#2841b5", right: "#1c2d87" };
+        const colTop = COLORS[topColorKey] || { topLight: "#7a96ff", topRim: "#5b7cfa", topMid: "#3b5bdb", mid: "#2841b5", left: "#2841b5", right: "#1c2d87" };
         const surfaceTiltRad = Math.atan2(topTiltY * 2, rx * 2);
-        const shoulderRx = getShoulderRxAtY(curY, maxCap, isGiantCat);
-        const topRxEff = Math.min(rx, shoulderRx);
-        const topDomeRy = Math.max(5.8, domeRy * (topRxEff / rx));
-        const rimDrop = 2.4;
+        const shoulderRx = getShoulderRxAtY(curY + 2.2, maxCap, isGiantCat);
+        const topRxEff = Math.min(rx + 0.4, shoulderRx + 0.4);
+        const rxScale = topRxEff / (rx + 0.4);
+        const ryUp = Math.max(4.5, (ryDynamic * 1.24) * rxScale);
+        const ryDown = Math.max(1.8, (ryDynamic * 0.36) * rxScale);
+        const menCy = waveCrest * 0.22;
 
         ctx.save();
-        ctx.translate(50, curY + rimDrop);
+        ctx.translate(50, curY + 2.2);
         ctx.rotate(surfaceTiltRad);
         ctx.globalAlpha = 1.0;
 
-        // (a) 向上拱起的水珠表面张力月牙高光斑（紧贴上拱弧顶内侧，呈现饱满凸起表面张力感）
+        // (a) 向上饱满凸起的非对称表面张力液面（上半拱高 ryUp=9.6px 显著向上凸出，下半沿仅微弧 ryDown=2.8px 自然贴合柱体！）
+        ctx.beginPath();
+        ctx.ellipse(0, menCy, topRxEff, ryUp, 0, Math.PI, Math.PI * 2, false);
+        ctx.ellipse(0, menCy, topRxEff, ryDown, 0, 0, Math.PI, false);
+        ctx.closePath();
+
+        // 球冠 3D 径向渐变：高光中心位于上方隆起处 (-topRxEff*0.15, -ryUp*0.48)，向外自然过渡到饱满水色，呈现立体水滴张力感！
+        if (topColorKey === "mystery_dark") {
+          const mg = ctx.createLinearGradient(0, menCy - ryUp, 0, menCy + ryDown);
+          mg.addColorStop(0, "#64748b");
+          mg.addColorStop(0.55, "#334155");
+          mg.addColorStop(1, "#1e293b");
+          ctx.fillStyle = mg;
+        } else {
+          const domeG = ctx.createRadialGradient(-topRxEff * 0.16, menCy - ryUp * 0.45, 1.5, 0, menCy - ryUp * 0.15, topRxEff * 1.05);
+          domeG.addColorStop(0.00, colTop.topLight);
+          domeG.addColorStop(0.32, colTop.topRim);
+          domeG.addColorStop(0.75, colTop.topMid);
+          domeG.addColorStop(1.00, colTop.mid);
+          ctx.fillStyle = domeG;
+        }
+        ctx.fill();
+
+        // (b) 向上隆起拱冠的月牙形水珠反光斑（沿上拱弧弯曲，强化向上鼓起的表面应力感）
         if (topColorKey !== "mystery_dark") {
-          const domeGlow = ctx.createRadialGradient(-topRxEff * 0.16, -topDomeRy * 0.58, 1, 0, -topDomeRy * 0.25, topRxEff * 0.85);
-          domeGlow.addColorStop(0.00, "rgba(255, 255, 255, 0.52)");
-          domeGlow.addColorStop(0.45, "rgba(255, 255, 255, 0.18)");
-          domeGlow.addColorStop(1.00, "rgba(255, 255, 255, 0)");
-          ctx.fillStyle = domeGlow;
+          ctx.save();
           ctx.beginPath();
-          ctx.ellipse(0, 0, topRxEff - 1.2, topDomeRy - 0.4, 0, Math.PI, Math.PI * 2, false);
-          ctx.closePath();
+          ctx.ellipse(-topRxEff * 0.12, menCy - ryUp * 0.42, topRxEff * 0.48, ryUp * 0.32, -0.06, 0, Math.PI * 2);
+          ctx.fillStyle = "rgba(255, 255, 255, 0.34)";
           ctx.fill();
 
-          // 拱顶左前侧水珠张力反光眉弧（向上弯曲）
-          ctx.strokeStyle = "rgba(255, 255, 255, 0.68)";
-          ctx.lineWidth = 2.1;
+          // 顶部水表面张力亮白反光眉弧（向上弯曲）
+          ctx.strokeStyle = "rgba(255, 255, 255, 0.72)";
+          ctx.lineWidth = 1.6;
           ctx.lineCap = "round";
           ctx.beginPath();
-          ctx.ellipse(0, 1.6, Math.max(2, topRxEff * 0.72), Math.max(2, topDomeRy * 0.76), 0, Math.PI * 1.15, Math.PI * 1.72, false);
+          ctx.ellipse(0, menCy + 0.5, Math.max(2, topRxEff * 0.70), Math.max(1.5, ryUp * 0.78), 0, Math.PI * 1.16, Math.PI * 1.72, false);
           ctx.stroke();
+          ctx.restore();
         }
 
-        // (b) 向上凸出的液面最高冠部张力亮边弧（PI*1.03 ~ PI*1.97，向上拱起！）
+        // (c) 液面最高冠部向上拱起的张力亮边（PI*1.04 ~ PI*1.96，绝不用深色描上沿！）
         ctx.strokeStyle = topColorKey === "mystery_dark" ? "#94a3b8" : colTop.topLight;
-        ctx.lineWidth = 1.85;
+        ctx.lineWidth = 1.55;
         ctx.lineCap = "round";
         ctx.beginPath();
-        ctx.ellipse(0, 0, Math.max(1, topRxEff - 0.6), Math.max(1, topDomeRy - 0.2), 0, Math.PI * 1.03, Math.PI * 1.97, false);
+        ctx.ellipse(0, menCy, Math.max(1, topRxEff - 0.5), Math.max(0.8, ryUp - 0.2), 0, Math.PI * 1.04, Math.PI * 1.96, false);
+        ctx.stroke();
+
+        // (d) 前沿微弧柔和过渡边
+        ctx.strokeStyle = topColorKey === "mystery_dark" ? "rgba(148, 163, 184, 0.4)" : colTop.topRim;
+        ctx.lineWidth = 1.1;
+        ctx.beginPath();
+        ctx.ellipse(0, menCy, Math.max(1, topRxEff - 0.8), Math.max(0.6, ryDown - 0.2), 0, 0.08 * Math.PI, 0.92 * Math.PI, false);
         ctx.stroke();
 
         ctx.restore();
