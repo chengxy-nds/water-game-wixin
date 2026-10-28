@@ -4499,6 +4499,14 @@ const __outerGlobalRef = (typeof globalThis !== 'undefined' && globalThis) ? glo
     // 真实工坊货架背景来自 design-image/详细设计/image copy 2.png；原图已复制到无空格的小游戏资源路径。
     let workshopBackdrop = null;
     let workshopBackdropReady = false;
+    // 直接使用设计稿中的空瓶 PNG；液体仍由规则状态实时绘制在玻璃后面。
+    let designedBottleSprite = null;
+    let designedBottleSpriteReady = false;
+    const designedUiSprites = Object.create(null);
+    const designedUiSpriteFiles = {
+      'shuffle-btn': 'action-shuffle.png', 'undo-btn': 'action-undo.png', 'hint-btn': 'action-hint.png',
+      'bag-green': 'bag-green.png', 'bag-purple': 'bag-purple.png', 'bag-gold': 'bag-gold.png', 'bag-cyan': 'bag-cyan.png'
+    };
     try {
       if (nativeApi && typeof nativeApi.createImage === 'function') workshopBackdrop = nativeApi.createImage();
       else if (typeof _g.Image === 'function') workshopBackdrop = new _g.Image();
@@ -4511,8 +4519,31 @@ const __outerGlobalRef = (typeof globalThis !== 'undefined' && globalThis) ? glo
         };
         workshopBackdrop.src = 'assets/workshop-shelf.png';
       }
+      if (nativeApi && typeof nativeApi.createImage === 'function') designedBottleSprite = nativeApi.createImage();
+      else if (typeof _g.Image === 'function') designedBottleSprite = new _g.Image();
+      if (designedBottleSprite) {
+        designedBottleSprite.onload = () => {
+          designedBottleSpriteReady = true;
+          bottleSlotCacheKey.length = 0;
+          bottleBackGlassCache.clear();
+          bottleFrontShellCache.clear();
+        };
+        designedBottleSprite.src = 'assets/game-sprites/empty-bottle.png';
+      }
+      Object.keys(designedUiSpriteFiles).forEach((key) => {
+        const img = nativeApi && typeof nativeApi.createImage === 'function' ? nativeApi.createImage()
+          : (typeof _g.Image === 'function' ? new _g.Image() : null);
+        if (!img) return;
+        img.onload = () => {
+          designedUiSprites[key] = img;
+          nativeBtnSpriteCache.delete(key);
+          nativeBagCache.clear();
+        };
+        img.src = `assets/game-sprites/${designedUiSpriteFiles[key]}`;
+      });
     } catch (e) {
       workshopBackdrop = null;
+      designedBottleSprite = null;
     }
 
     function getThemeBackgroundCanvas(w, h) {
@@ -4765,6 +4796,7 @@ const __outerGlobalRef = (typeof globalThis !== 'undefined' && globalThis) ? glo
     // ---------------- 2. 100% 原生 Canvas 2D 烘焙 6 枚超椭圆折射玻璃按钮（彻底解决变黑与缺图标问题！） ----------------
     const nativeBtnSpriteCache = new Map();
     function getNativeGlassButtonSprite(btnId) {
+      if (activeThemeId === 'zen_amber' && designedUiSprites[btnId]) return designedUiSprites[btnId];
       if (nativeBtnSpriteCache.has(btnId)) return nativeBtnSpriteCache.get(btnId);
       const S = 220;
       const off = createOffscreenCanvas(64, 64);
@@ -5070,6 +5102,13 @@ const __outerGlobalRef = (typeof globalThis !== 'undefined' && globalThis) ? glo
     const nativeBagCache = new Map();
     function getNativeBagCanvas(bag, bagIdx) {
       if (!bag || bag.removed) return null;
+      if (activeThemeId === 'zen_amber' && !bag.packedBottle) {
+        const color = bag.locked ? 'gold'
+          : (bag.color === 'green' ? 'green' : (bag.color === 'purple' ? 'purple'
+            : (bag.color === 'cyan' || bag.color === 'blue' ? 'cyan' : 'gold')));
+        const designedBag = designedUiSprites[`bag-${color}`];
+        if (designedBag) return designedBag;
+      }
       const key = bag.locked ? 'native_bag_locked' : `native_bag_${bag.color || 'green'}_pk_${bag.packedBottle || 'none'}`;
       if (nativeBagCache.has(key)) return nativeBagCache.get(key);
 
@@ -6870,6 +6909,11 @@ const __outerGlobalRef = (typeof globalThis !== 'undefined' && globalThis) ? glo
     const bottleBackGlassCache = new Map();
     const bottleFrontShellCache = new Map();
 
+    function usesDesignedBottleSprite(b) {
+      return activeThemeId === 'zen_amber' && designedBottleSpriteReady && designedBottleSprite
+        && !b.isGiantCat && (!b.special || b.special === 'none');
+    }
+
     function getCachedBottleBackGlass(b, idx, maxCap, isGiantCat, vbMinX, vbMinY, vbW, vbH) {
       const neckOff = getNeckOffsetY(maxCap, isGiantCat);
       const key = `bg_${maxCap}_${neckOff}_${isGiantCat ? 1 : 0}_${b.special || 'none'}_${b.requiredColor || ''}`;
@@ -6918,9 +6962,12 @@ const __outerGlobalRef = (typeof globalThis !== 'undefined' && globalThis) ? glo
     }
 
     function renderBottleDirectToCtx(targetCtx, b, idx, maxCap, isGiantCat, vbMinX, vbMinY, vbW, vbH, liqOpts) {
+      const useDesignedBottle = usesDesignedBottleSprite(b);
       // (0) 极速贴入离屏缓存好的后壁立体折射玻璃底色（避免晃动/倾倒时每帧重绘后壁 Path2D）
-      const bgSp = getCachedBottleBackGlass(b, idx, maxCap, isGiantCat, vbMinX, vbMinY, vbW, vbH);
-      targetCtx.drawImage(bgSp, vbMinX, vbMinY, vbW, vbH);
+      if (!useDesignedBottle) {
+        const bgSp = getCachedBottleBackGlass(b, idx, maxCap, isGiantCat, vbMinX, vbMinY, vbW, vbH);
+        targetCtx.drawImage(bgSp, vbMinX, vbMinY, vbW, vbH);
+      }
 
       // (1) 绘制瓶腔内 3D 圆柱体积药水
       const hideLiquid = (b.special === 'paper_bag' || b.special === 'silk_drape');
@@ -6949,8 +6996,11 @@ const __outerGlobalRef = (typeof globalThis !== 'undefined' && globalThis) ? glo
       }
 
       // (2) 极速贴入离屏缓存好的前壁软箱高光柱、沉底焦散厚玻璃底座、10层立体玻璃瓶口与特殊机关
-      const fsSp = getCachedBottleFrontShell(b, idx, maxCap, isGiantCat, vbMinX, vbMinY, vbW, vbH);
-      if (fsSp) {
+      const fsSp = useDesignedBottle ? null : getCachedBottleFrontShell(b, idx, maxCap, isGiantCat, vbMinX, vbMinY, vbW, vbH);
+      if (useDesignedBottle) {
+        // 设计稿空瓶精灵叠在实时液体之上，保留瓶身高光、厚底和开口的原始质感。
+        targetCtx.drawImage(designedBottleSprite, 16.5, 3, 67, 204);
+      } else if (fsSp) {
         targetCtx.drawImage(fsSp, vbMinX, vbMinY, vbW, vbH);
       } else {
         drawNativeBottleShellAndSpecials(targetCtx, b, idx);
