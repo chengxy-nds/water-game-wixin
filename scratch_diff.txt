@@ -1,0 +1,797 @@
+﻿diff --git a/game.js b/game.js
+index 99880ec..94f6e67 100644
+--- a/game.js
++++ b/game.js
+@@ -2122,7 +2122,7 @@ const __outerGlobalRef = (typeof globalThis !== 'undefined' && globalThis) ? glo
+         const catW = Math.min(catSpanW, 158, stageH * 0.45 * (124 / 224));
+         const catH = catW * (224 / 124);
+         const left = shellX + padX + 2 * (cellW + colGap) + (catSpanW - catW) * 0.5;
+-        const top = stageCy - catH * 0.5;
++        const top = activeThemeId === 'zen_amber' ? (H * 0.674 - catH) : (stageCy - catH * 0.5);
+         return makeRect(left, top, catW, catH);
+       }
+       const sideMap = { 0: [0, 0], 1: [0, 1], 3: [0, 5], 4: [0, 6], 5: [1, 0], 6: [1, 1], 7: [1, 5], 8: [1, 6] };
+@@ -2130,7 +2130,11 @@ const __outerGlobalRef = (typeof globalThis !== 'undefined' && globalThis) ? glo
+       const offX = slotPose.leftPx || 0;
+       const offY = slotPose.topPx || 0;
+       const left = shellX + padX + c * (cellW + colGap) + (cellW - stdSlotW) * 0.5 + offX;
+-      const top = gridStartY + r * (stdSlotH + rowGap) + offY;
++      let botY = gridStartY + (r + 1) * stdSlotH + r * rowGap;
++      if (activeThemeId === 'zen_amber') {
++        botY = r === 0 ? H * 0.493 : H * 0.674;
++      }
++      const top = botY - stdSlotH + offY;
+       return makeRect(left, top, stdSlotW, stdSlotH);
+     }
+ 
+@@ -2164,7 +2168,16 @@ const __outerGlobalRef = (typeof globalThis !== 'undefined' && globalThis) ? glo
+     const offX = slotPose.leftPx || 0;
+     const offY = slotPose.topPx || 0;
+ 
+-    const rowBottomY = gridStartY + (r + 1) * baseRowH + r * rowGap;
++    let rowBottomY = gridStartY + (r + 1) * baseRowH + r * rowGap;
++    if (activeThemeId === 'zen_amber') {
++      if (rows === 1) {
++        rowBottomY = H * 0.674;
++      } else if (rows === 2) {
++        rowBottomY = r === 0 ? H * 0.493 : H * 0.674;
++      } else {
++        rowBottomY = r === 0 ? H * 0.493 : (r === 1 ? H * 0.674 : H * 0.859);
++      }
++    }
+     let left = shellX + padX + c * (cellW + colGap) + (cellW - slotW) * 0.5 + offX;
+     let top = rowBottomY - slotH + offY;
+     let w = slotW, h = slotH;
+@@ -2196,16 +2209,16 @@ const __outerGlobalRef = (typeof globalThis !== 'undefined' && globalThis) ? glo
+     const bagRects = [];
+     if (cfg && cfg.hasBags) {
+       const bagAreaW = Math.min(shellW - 24, 384);
+-      const gap = 14;
+-      const slotW = Math.min(76, (bagAreaW - gap * 3) / 4);
++      const gap = 12;
++      const slotW = Math.min(74, (bagAreaW - gap * 3) / 4);
+       const totalW = slotW * 4 + gap * 3;
+       const startX = shellX + (shellW - totalW) * 0.5;
+       const bagH = activeThemeId === 'zen_amber'
+-        ? Math.min(100, Math.max(84, H * 0.112))
++        ? Math.min(94, Math.max(78, H * 0.106))
+         : Math.min(112, Math.max(90, H * 0.132));
+-      // 工坊袋子固定落在背景最上层柜台：用台面底边作为锚点，不随关卡瓶数移动。
++      // 工坊袋子固定落在背景最上层柜台（台面位置为背景 H * 0.284）
+       const bagTop = activeThemeId === 'zen_amber'
+-        ? H * 0.314 - bagH
++        ? H * 0.284 - bagH
+         : headerBottomY;
+       const bagCount = Math.max(4, bags ? bags.length : 4);
+       for (let i = 0; i < bagCount; i++) {
+@@ -4505,7 +4518,13 @@ const __outerGlobalRef = (typeof globalThis !== 'undefined' && globalThis) ? glo
+     const designedUiSprites = Object.create(null);
+     const designedUiSpriteFiles = {
+       'shuffle-btn': 'action-shuffle.png', 'undo-btn': 'action-undo.png', 'hint-btn': 'action-hint.png',
+-      'bag-green': 'bag-green.png', 'bag-purple': 'bag-purple.png', 'bag-gold': 'bag-gold.png', 'bag-cyan': 'bag-cyan.png'
++      'bag-green': 'bag-green.png', 'bag-purple': 'bag-purple.png', 'bag-gold': 'bag-gold.png', 'bag-cyan': 'bag-cyan.png',
++      'top-plaque': 'top-plaque.png', 'btn-menu': 'btn-menu.png', 'btn-help': 'btn-help.png',
++      'gold-ad-bottle': 'gold-ad-bottle.png', 'settings-card': 'settings-card.png',
++      'settings-plaque': 'settings-plaque.png', 'settings-close-x': 'settings-close-x.png',
++      'win-ribbon': 'win-ribbon.png', 'win-next-btn': 'win-next-btn.png',
++      'win-double-btn': 'win-double-btn.png', 'win-pedestal': 'win-pedestal.png',
++      'unlock-ribbon': 'unlock-ribbon.png', 'unlock-btn': 'unlock-btn.png'
+     };
+     try {
+       if (nativeApi && typeof nativeApi.createImage === 'function') workshopBackdrop = nativeApi.createImage();
+@@ -4796,7 +4815,11 @@ const __outerGlobalRef = (typeof globalThis !== 'undefined' && globalThis) ? glo
+     // ---------------- 2. 100% 原生 Canvas 2D 烘焙 6 枚超椭圆折射玻璃按钮（彻底解决变黑与缺图标问题！） ----------------
+     const nativeBtnSpriteCache = new Map();
+     function getNativeGlassButtonSprite(btnId) {
+-      if (activeThemeId === 'zen_amber' && designedUiSprites[btnId]) return designedUiSprites[btnId];
++      if (activeThemeId === 'zen_amber') {
++        if (btnId === 'settings-btn' && designedUiSprites['btn-menu']) return designedUiSprites['btn-menu'];
++        if (btnId === 'rules-help-btn' && designedUiSprites['btn-help']) return designedUiSprites['btn-help'];
++        if (designedUiSprites[btnId]) return designedUiSprites[btnId];
++      }
+       if (nativeBtnSpriteCache.has(btnId)) return nativeBtnSpriteCache.get(btnId);
+       const S = 220;
+       const off = createOffscreenCanvas(64, 64);
+@@ -7607,30 +7630,46 @@ const __outerGlobalRef = (typeof globalThis !== 'undefined' && globalThis) ? glo
+         const mechInfo = (typeof MECHANIC_INTROS !== 'undefined' && MECHANIC_INTROS[mechKey]) || MECHANIC_INTROS.basic_rule;
+         const isCurrentLvMech = (window._handbookActiveLevelKey === mechKey);
+ 
+-        const ribTop = h * 0.14;
+-        const ribH = 108;
+-        drawFig2RibbonHeader(ctx, w * 0.5, ribTop, bannerW, ribH, mechInfo.title || '机关图鉴');
++        const ribTop = h * 0.12;
++        if (isCurrentLvMech && designedUiSprites['unlock-ribbon']) {
++          const uSp = designedUiSprites['unlock-ribbon'];
++          const uW = Math.min(bannerW + 36, 360);
++          const uH = uW * (189 / 463);
++          ctx.drawImage(uSp, w * 0.5 - uW * 0.5, ribTop, uW, uH);
++        } else if (designedUiSprites['top-plaque']) {
++          const pSp = designedUiSprites['top-plaque'];
++          const pW = Math.min(bannerW, 250);
++          const pH = pW * (140 / 361);
++          ctx.drawImage(pSp, w * 0.5 - pW * 0.5, ribTop + 8, pW, pH);
++          ctx.save();
++          ctx.font = '900 20px "PingFang SC", "Microsoft YaHei", sans-serif';
++          ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
++          ctx.lineWidth = 3.2;
++          ctx.strokeStyle = 'rgba(67, 34, 14, 0.88)';
++          ctx.strokeText(mechInfo.title || '道具图鉴', w * 0.5, ribTop + 8 + pH * 0.44 + 0.5);
++          ctx.fillStyle = '#fff4dc';
++          ctx.fillText(mechInfo.title || '道具图鉴', w * 0.5, ribTop + 8 + pH * 0.44);
++          ctx.restore();
++        } else {
++          drawFig2RibbonHeader(ctx, w * 0.5, ribTop, bannerW, 108, mechInfo.title || '机关图鉴');
++        }
+ 
+         const mxW = 38, mxH = 38;
+-        const mxX = Math.min(w - mxW - 14, w * 0.5 + bannerW * 0.5 - 26);
+-        const mxY = ribTop + 42;
+-        draw3DGlossyModalButton(ctx, mxX, mxY, mxW, mxH, 13, MODAL_BTN_PALETTES.coralSquare, '', 16);
+-        ctx.save();
+-        const mxcx = mxX + mxW * 0.5, mxcy = mxY + mxH * 0.5;
+-        ctx.strokeStyle = '#ffffff';
+-        ctx.lineWidth = 3.2; ctx.lineCap = 'round';
+-        ctx.beginPath();
+-        ctx.moveTo(mxcx - 5.5, mxcy - 5.5); ctx.lineTo(mxcx + 5.5, mxcy + 5.5);
+-        ctx.moveTo(mxcx + 5.5, mxcy - 5.5); ctx.lineTo(mxcx - 5.5, mxcy + 5.5);
+-        ctx.stroke();
+-        ctx.restore();
++        const mxX = Math.min(w - mxW - 14, w * 0.5 + bannerW * 0.5 - 20);
++        const mxY = ribTop + 36;
++        const closeXSp = designedUiSprites['settings-close-x'];
++        if (closeXSp) {
++          ctx.drawImage(closeXSp, mxX, mxY, mxW, mxH);
++        } else {
++          draw3DGlossyModalButton(ctx, mxX, mxY, mxW, mxH, 13, MODAL_BTN_PALETTES.coralSquare, '', 16);
++        }
+         registerHitRegion('mech_close_x', mxX - 6, mxY - 6, mxW + 12, mxH + 12, 240, () => {
+           uiState.openModalId = null;
+           playSound('modal_close');
+         });
+ 
+         ctx.save();
+-        const badgeY = ribTop + ribH + 4;
++        const badgeY = ribTop + 104;
+         ctx.beginPath();
+         ctx.roundRect(w * 0.5 - 92, badgeY - 11, 184, 22, 11);
+         ctx.fillStyle = isCurrentLvMech ? 'rgba(22, 163, 74, 0.90)' : 'rgba(120, 72, 18, 0.82)';
+@@ -7641,7 +7680,7 @@ const __outerGlobalRef = (typeof globalThis !== 'undefined' && globalThis) ? glo
+         ctx.fillStyle = '#ffffff';
+         ctx.font = '800 11.5px "Fredoka", "PingFang SC", sans-serif';
+         ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+-        ctx.fillText(`${isCurrentLvMech ? '★ 本关出场 · ' : '机关图鉴 · '}${mechInfo.name || ''} (${hIdx + 1}/${totalH})`, w * 0.5, badgeY);
++        ctx.fillText(`${isCurrentLvMech ? '★ 新道具解锁 · ' : '道具图鉴 · '}${mechInfo.name || ''} (${hIdx + 1}/${totalH})`, w * 0.5, badgeY);
+         ctx.restore();
+ 
+         const sRect = makeRect(shellX + (shellW - 260) * 0.5, h * 0.28, 260, 250);
+@@ -7712,13 +7751,26 @@ const __outerGlobalRef = (typeof globalThis !== 'undefined' && globalThis) ? glo
+         }
+         ctx.restore();
+ 
+-        ctx.save();
+-        ctx.globalAlpha = 0.75 + 0.25 * Math.sin(nowMs * 0.0035);
+-        ctx.fillStyle = '#ffffff';
+-        ctx.font = '800 15px "Fredoka", "PingFang SC", sans-serif';
+-        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+-        ctx.fillText('◀ 左右切换查看全部机关 · 点击空白处继续游戏 ▶', w * 0.5, h * 0.76 + 28);
+-        ctx.restore();
++        if (isCurrentLvMech && designedUiSprites['unlock-btn']) {
++          const ubSp = designedUiSprites['unlock-btn'];
++          const ubW = Math.min(w - 60, 240);
++          const ubH = ubW * (143 / 435);
++          const ubX = (w - ubW) * 0.5;
++          const ubY = boxY + boxH + 14;
++          ctx.drawImage(ubSp, ubX, ubY, ubW, ubH);
++          registerHitRegion('mech_ack_btn', ubX, ubY, ubW, ubH, 240, () => {
++            uiState.openModalId = null;
++            playSound('modal_close');
++          });
++        } else {
++          ctx.save();
++          ctx.globalAlpha = 0.75 + 0.25 * Math.sin(nowMs * 0.0035);
++          ctx.fillStyle = '#ffffff';
++          ctx.font = '800 14px "Fredoka", "PingFang SC", sans-serif';
++          ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
++          ctx.fillText('◀ 左右切换查看全部图鉴 · 点击空白处继续游戏 ▶', w * 0.5, boxY + boxH + 24);
++          ctx.restore();
++        }
+ 
+         ctx.restore();
+         return true;
+@@ -7813,27 +7865,24 @@ const __outerGlobalRef = (typeof globalThis !== 'undefined' && globalThis) ? glo
+         ctx.scale(popScale, popScale);
+         ctx.translate(-w * 0.5, -centerY);
+ 
+-        drawFig2RibbonHeader(ctx, w * 0.5, ribTopY, bannerW, 108, winTitle);
++        const winRibbonSp = designedUiSprites['win-ribbon'];
++        const ribW = Math.min(bannerW + 28, 360);
++        const ribH = ribW * (119 / 373);
++        if (winRibbonSp) {
++          ctx.drawImage(winRibbonSp, w * 0.5 - ribW * 0.5, ribTopY, ribW, ribH);
++        } else {
++          drawFig2RibbonHeader(ctx, w * 0.5, ribTopY, bannerW, 108, winTitle);
++        }
+ 
+         const xW = 38, xH = 38;
+-        const xX = Math.min(w - xW - 14, w * 0.5 + bannerW * 0.5 - 26);
+-        const xY = ribTopY + 42;
+-        draw3DGlossyModalButton(ctx, xX, xY, xW, xH, 13, MODAL_BTN_PALETTES.coralSquare, '', 16);
+-        ctx.save();
+-        const xcx = xX + xW * 0.5, xcy = xY + xH * 0.5;
+-        ctx.strokeStyle = 'rgba(70, 24, 6, 0.35)';
+-        ctx.lineWidth = 3.4; ctx.lineCap = 'round';
+-        ctx.beginPath();
+-        ctx.moveTo(xcx - 5.5, xcy - 4.2); ctx.lineTo(xcx + 5.5, xcy + 6.8);
+-        ctx.moveTo(xcx + 5.5, xcy - 4.2); ctx.lineTo(xcx - 5.5, xcy + 6.8);
+-        ctx.stroke();
+-        ctx.strokeStyle = '#ffffff';
+-        ctx.lineWidth = 3.2;
+-        ctx.beginPath();
+-        ctx.moveTo(xcx - 5.5, xcy - 5.5); ctx.lineTo(xcx + 5.5, xcy + 5.5);
+-        ctx.moveTo(xcx + 5.5, xcy - 5.5); ctx.lineTo(xcx - 5.5, xcy + 5.5);
+-        ctx.stroke();
+-        ctx.restore();
++        const xX = Math.min(w - xW - 14, w * 0.5 + ribW * 0.5 - 24);
++        const xY = ribTopY + 36;
++        const closeXSp = designedUiSprites['settings-close-x'];
++        if (closeXSp) {
++          ctx.drawImage(closeXSp, xX, xY, xW, xH);
++        } else {
++          draw3DGlossyModalButton(ctx, xX, xY, xW, xH, 13, MODAL_BTN_PALETTES.coralSquare, '', 16);
++        }
+         registerHitRegion('win_close_x', xX - 6, xY - 6, xW + 12, xH + 12, 240, () => {
+           uiState.openModalId = null;
+           playSound('modal_close');
+@@ -7956,7 +8005,7 @@ const __outerGlobalRef = (typeof globalThis !== 'undefined' && globalThis) ? glo
+         const honorW = Math.max(216, Math.min(w - 48, ctx.measureText(honorTxt).width + 34));
+         const honorH = 25;
+         const honorX = (w - honorW) * 0.5;
+-        const honorY = trophyCy + 42;
++        const honorY = trophyCy + 40;
+         ctx.beginPath();
+         ctx.roundRect(honorX, honorY, honorW, honorH, honorH * 0.5);
+         const hg = ctx.createLinearGradient(honorX, honorY, honorX + honorW, honorY);
+@@ -7974,12 +8023,40 @@ const __outerGlobalRef = (typeof globalThis !== 'undefined' && globalThis) ? glo
+         ctx.fillText(honorTxt, w * 0.5, honorY + honorH * 0.5 + 0.5);
+         ctx.restore();
+ 
+-        // 战绩与暖心鼓励大卡片
++        // 3D 三联通关奖励底座 (对应 design-image2/通关界面.png)
++        const pedSp = designedUiSprites['win-pedestal'];
+         const pillW = Math.min(w - 32, 338);
+         const pillX = (w - pillW) * 0.5;
+-        const pillY = trophyCy + 74;
+-        const pillH = 122;
+-        drawFig2CreamGoldPill(ctx, pillX, pillY, pillW, pillH, 22);
++        if (pedSp) {
++          const pedW = Math.min(pillW - 16, 280);
++          const pedH = pedW * (137 / 301);
++          const pedX = (w - pedW) * 0.5;
++          const pedY = honorY + honorH + 6;
++          ctx.drawImage(pedSp, pedX, pedY, pedW, pedH);
++
++          const rewards = [
++            { txt: 'x50', color: '#f59e0b' },
++            { txt: 'x1', color: '#10b981' },
++            { txt: 'x1', color: '#a855f7' }
++          ];
++          rewards.forEach((rw, rk) => {
++            const rx = pedX + pedW * ((rk * 2 + 1) / 6);
++            ctx.save();
++            ctx.font = '900 12.5px "Fredoka", sans-serif';
++            ctx.fillStyle = '#ffffff';
++            ctx.strokeStyle = 'rgba(70, 30, 8, 0.9)';
++            ctx.lineWidth = 2.4;
++            ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
++            ctx.strokeText(rw.txt, rx, pedY + pedH - 12);
++            ctx.fillText(rw.txt, rx, pedY + pedH - 12);
++            ctx.restore();
++          });
++        }
++
++        // 战绩与暖心鼓励大卡片
++        const pillY = honorY + honorH + (pedSp ? (Math.min(pillW - 16, 280) * (137 / 301) + 12) : 10);
++        const pillH = 108;
++        drawFig2CreamGoldPill(ctx, pillX, pillY, pillW, pillH, 20);
+ 
+         ctx.save();
+         const cols = [
+@@ -7991,18 +8068,18 @@ const __outerGlobalRef = (typeof globalThis !== 'undefined' && globalThis) ? glo
+           const cx = pillX + pillW * ((i * 2 + 1) / 6);
+           ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+           ctx.fillStyle = '#92400e'; ctx.font = '800 11.5px "PingFang SC", "Microsoft YaHei", sans-serif';
+-          ctx.fillText(lbl, cx, pillY + 21);
+-          ctx.fillStyle = col; ctx.font = '900 17.5px "PingFang SC", "Microsoft YaHei", sans-serif';
+-          ctx.fillText(val, cx, pillY + 44);
++          ctx.fillText(lbl, cx, pillY + 18);
++          ctx.fillStyle = col; ctx.font = '900 16.5px "PingFang SC", "Microsoft YaHei", sans-serif';
++          ctx.fillText(val, cx, pillY + 39);
+         });
+ 
+         // 内部暖金鼓励语横幅框
+         const encBoxX = pillX + 12;
+-        const encBoxY = pillY + 62;
++        const encBoxY = pillY + 54;
+         const encBoxW = pillW - 24;
+-        const encBoxH = 48;
++        const encBoxH = 44;
+         ctx.beginPath();
+-        ctx.roundRect(encBoxX, encBoxY, encBoxW, encBoxH, 12);
++        ctx.roundRect(encBoxX, encBoxY, encBoxW, encBoxH, 10);
+         const encG = ctx.createLinearGradient(0, encBoxY, 0, encBoxY + encBoxH);
+         encG.addColorStop(0, 'rgba(254, 243, 199, 0.92)');
+         encG.addColorStop(1, 'rgba(253, 230, 138, 0.72)');
+@@ -8016,17 +8093,24 @@ const __outerGlobalRef = (typeof globalThis !== 'undefined' && globalThis) ? glo
+         const subEncourageTxt = uiState.scoreEncourageSub || '眼明手快、思路清晰，继续保持这股火热手感！';
+         ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+         ctx.fillStyle = '#b45309';
+-        ctx.font = '900 12.5px "PingFang SC", "Microsoft YaHei", sans-serif';
+-        ctx.fillText(praiseTxt, pillX + pillW * 0.5, encBoxY + 16, encBoxW - 14);
++        ctx.font = '900 12px "PingFang SC", "Microsoft YaHei", sans-serif';
++        ctx.fillText(praiseTxt, pillX + pillW * 0.5, encBoxY + 15, encBoxW - 14);
+         ctx.fillStyle = '#15803d';
+-        ctx.font = '800 11px "PingFang SC", "Microsoft YaHei", sans-serif';
+-        ctx.fillText(subEncourageTxt, pillX + pillW * 0.5, encBoxY + 35, encBoxW - 14);
++        ctx.font = '800 10.5px "PingFang SC", "Microsoft YaHei", sans-serif';
++        ctx.fillText(subEncourageTxt, pillX + pillW * 0.5, encBoxY + 31, encBoxW - 14);
+         ctx.restore();
+ 
+-        const btnY = pillY + pillH + 18;
++        const btnY = pillY + pillH + 16;
+         const btnW = (pillW - 14) * 0.5;
+-        const btnH = 50;
+-        draw3DGlossyModalButton(ctx, pillX, btnY, btnW, btnH, 16, MODAL_BTN_PALETTES.amber, '重玩本关', 16.5);
++        const btnH = Math.min(52, btnW * (87 / 239));
++        const doubleBtnSp = designedUiSprites['win-double-btn'];
++        const nextBtnSp = designedUiSprites['win-next-btn'];
++
++        if (doubleBtnSp) {
++          ctx.drawImage(doubleBtnSp, pillX, btnY, btnW, btnH);
++        } else {
++          draw3DGlossyModalButton(ctx, pillX, btnY, btnW, btnH, 16, MODAL_BTN_PALETTES.amber, '双倍奖励', 16.5);
++        }
+         registerHitRegion('modal-restart-btn', pillX, btnY, btnW, btnH, 220, () => {
+           playSound('btn_restart');
+           uiState.openModalId = null;
+@@ -8041,7 +8125,11 @@ const __outerGlobalRef = (typeof globalThis !== 'undefined' && globalThis) ? glo
+         ctx.translate(nextBtnX + btnW * 0.5, btnY + btnH * 0.5);
+         ctx.scale(nextPulse, nextPulse);
+         ctx.translate(-(nextBtnX + btnW * 0.5), -(btnY + btnH * 0.5));
+-        draw3DGlossyModalButton(ctx, nextBtnX, btnY, btnW, btnH, 16, MODAL_BTN_PALETTES.green, '下一关 ▶', 16.5);
++        if (nextBtnSp) {
++          ctx.drawImage(nextBtnSp, nextBtnX, btnY, btnW, btnH);
++        } else {
++          draw3DGlossyModalButton(ctx, nextBtnX, btnY, btnW, btnH, 16, MODAL_BTN_PALETTES.green, '下一关 ▶', 16.5);
++        }
+         ctx.restore();
+         registerHitRegion('modal-next-btn', nextBtnX, btnY, btnW, btnH, 220, () => {
+           playSound('ui_tap');
+@@ -8061,170 +8149,171 @@ const __outerGlobalRef = (typeof globalThis !== 'undefined' && globalThis) ? glo
+       // 已按要求：默认微缩舞台并移除微缩开关、移除提速按钮、移除跳过按钮、倍速开放至 3 倍速！
+       // ====================================================================
+       if (maskId === 'pause-modal-mask') {
+-        const pillW = Math.min(w - 32, 336);
+-        const pillX = (w - pillW) * 0.5;
+-        const totalH = 100 + 3 * 52 + 72 + 56 + 52;
+-        const ribTopY = Math.max(24, (h - totalH) * 0.46);
++        const cardSp = designedUiSprites['settings-card'];
++        const plaqueSp = designedUiSprites['settings-plaque'];
++        const closeXSp = designedUiSprites['settings-close-x'];
++
++        const maxCardW = Math.min(w - 28, 344);
++        let cardW = maxCardW;
++        let cardH = cardW * (779 / 405);
++        if (cardH > h - 60) {
++          cardH = h - 60;
++          cardW = cardH * (405 / 779);
++        }
++        const cardX = (w - cardW) * 0.5;
++        const cardY = (h - cardH) * 0.5 + 16;
+ 
+-        drawFig2SpotlightRays(ctx, w * 0.5, ribTopY + 210, 175, nowMs, 0.65);
+-        drawFig2RibbonHeader(ctx, w * 0.5, ribTopY, bannerW, 98, '设置');
++        drawFig2SpotlightRays(ctx, w * 0.5, cardY + cardH * 0.45, 175, nowMs, 0.65);
+ 
+-        const xW = 38, xH = 38;
+-        const xX = Math.min(w - xW - 14, w * 0.5 + bannerW * 0.5 - 26);
+-        const xY = ribTopY + 38;
+-        draw3DGlossyModalButton(ctx, xX, xY, xW, xH, 13, MODAL_BTN_PALETTES.coralSquare, '', 16);
+-        ctx.save();
+-        const xcx = xX + xW * 0.5, xcy = xY + xH * 0.5;
+-        ctx.strokeStyle = 'rgba(70, 24, 6, 0.35)';
+-        ctx.lineWidth = 3.4; ctx.lineCap = 'round';
+-        ctx.beginPath();
+-        ctx.moveTo(xcx - 5.5, xcy - 4.2); ctx.lineTo(xcx + 5.5, xcy + 6.8);
+-        ctx.moveTo(xcx + 5.5, xcy - 4.2); ctx.lineTo(xcx - 5.5, xcy + 6.8);
+-        ctx.stroke();
+-        ctx.strokeStyle = '#ffffff';
+-        ctx.lineWidth = 3.2;
+-        ctx.beginPath();
+-        ctx.moveTo(xcx - 5.5, xcy - 5.5); ctx.lineTo(xcx + 5.5, xcy + 5.5);
+-        ctx.moveTo(xcx + 5.5, xcy - 5.5); ctx.lineTo(xcx - 5.5, xcy + 5.5);
+-        ctx.stroke();
+-        ctx.restore();
+-        registerHitRegion('modal_close_x', xX - 6, xY - 6, xW + 12, xH + 12, 240, () => {
++        // 1. 象牙白暖羊皮纸圆角卡片底板
++        if (cardSp) {
++          ctx.drawImage(cardSp, cardX, cardY, cardW, cardH);
++        } else {
++          drawFig2CreamGoldPill(ctx, cardX, cardY, cardW, cardH, 24);
++        }
++
++        // 2. 顶部“设置”木雕牌匾（带翠绿叶子与药水瓶）
++        const plaqueW = Math.min(cardW * 0.82, 276);
++        const plaqueH = plaqueW * (139 / 323);
++        const plaqueX = cardX + (cardW - plaqueW) * 0.5;
++        const plaqueY = cardY - plaqueH * 0.42;
++        if (plaqueSp) {
++          ctx.drawImage(plaqueSp, plaqueX, plaqueY, plaqueW, plaqueH);
++        } else {
++          drawFig2RibbonHeader(ctx, w * 0.5, plaqueY, bannerW, 98, '设置');
++        }
++
++        // 3. 右上角红木“✕”关闭键
++        const xSize = Math.min(42, cardW * 0.125);
++        const xX = cardX + cardW - xSize * 0.88;
++        const xY = plaqueY + 8;
++        if (closeXSp) {
++          ctx.drawImage(closeXSp, xX, xY, xSize, xSize);
++        } else {
++          draw3DGlossyModalButton(ctx, xX, xY, xSize, xSize, 13, MODAL_BTN_PALETTES.coralSquare, '', 16);
++        }
++        registerHitRegion('modal_close_x', xX - 6, xY - 6, xSize + 12, xSize + 12, 240, () => {
+           uiState.openModalId = null;
+           playSound('modal_close');
+         });
+ 
++        // 4. 三行翡翠绿胶囊滑动开关（音效、震动、音乐）
+         const settingItems = [
+-          { key: 'sound', label: '音效', isOn: !!userSettings.sound },
+-          { key: 'vibrate', label: '震动', isOn: !!userSettings.vibrate },
+-          { key: 'music', label: '音乐', isOn: !!userSettings.music }
++          { key: 'sound', label: '游戏音效', isOn: !!userSettings.sound },
++          { key: 'vibrate', label: '震动反馈', isOn: !!userSettings.vibrate },
++          { key: 'music', label: '背景音乐', isOn: !!userSettings.music }
+         ];
+-        const rowsStartY = ribTopY + 104;
++        const rowStartY = cardY + cardH * 0.185;
++        const rowH = Math.min(46, cardH * 0.086);
++        const rowGap = Math.min(12, cardH * 0.022);
++        const rowW = cardW - 36;
++        const rowX = cardX + 18;
++
+         settingItems.forEach((item, rIdx) => {
+-          const rY = rowsStartY + rIdx * 52;
+-          const rH = 45;
+-          drawFig2CreamGoldPill(ctx, pillX, rY, pillW, rH, 18);
++          const rY = rowStartY + rIdx * (rowH + rowGap);
++          drawFig2CreamGoldPill(ctx, rowX, rY, rowW, rowH, 16);
+ 
+           ctx.save();
+-          ctx.font = '800 16px "Fredoka", "PingFang SC", "Microsoft YaHei", sans-serif';
++          ctx.font = '800 15px "PingFang SC", "Microsoft YaHei", sans-serif';
+           ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+-          ctx.fillStyle = '#7c3f0e';
+-          ctx.fillText(item.label, pillX + 48, rY + rH * 0.5);
++          ctx.fillStyle = '#6c3a10';
++          ctx.fillText(item.label, rowX + 46, rY + rowH * 0.5);
+ 
+-          const icX = pillX + 26, icY = rY + rH * 0.5;
++          // 图标绘制
++          const icX = rowX + 26, icY = rY + rowH * 0.5;
+           ctx.strokeStyle = '#92400e';
+           ctx.fillStyle = '#f59e0b';
+-          ctx.lineWidth = 2.1;
+-          ctx.lineCap = 'round';
+-          ctx.lineJoin = 'round';
++          ctx.lineWidth = 2.0; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+           if (rIdx === 0) {
+             ctx.beginPath();
+-            ctx.moveTo(icX - 7.5, icY - 3.2); ctx.lineTo(icX - 3.2, icY - 3.2);
+-            ctx.lineTo(icX + 2.2, icY - 7.5); ctx.lineTo(icX + 2.2, icY + 7.5);
+-            ctx.lineTo(icX - 3.2, icY + 3.2); ctx.lineTo(icX - 7.5, icY + 3.2);
++            ctx.moveTo(icX - 7, icY - 3); ctx.lineTo(icX - 3, icY - 3);
++            ctx.lineTo(icX + 2, icY - 7); ctx.lineTo(icX + 2, icY + 7);
++            ctx.lineTo(icX - 3, icY + 3); ctx.lineTo(icX - 7, icY + 3);
+             ctx.closePath(); ctx.fill(); ctx.stroke();
+-            ctx.beginPath(); ctx.arc(icX + 3.2, icY, 4.5, -0.68, 0.68); ctx.stroke();
+-            ctx.beginPath(); ctx.arc(icX + 3.2, icY, 8.0, -0.74, 0.74); ctx.stroke();
++            ctx.beginPath(); ctx.arc(icX + 3, icY, 4.2, -0.68, 0.68); ctx.stroke();
++            ctx.beginPath(); ctx.arc(icX + 3, icY, 7.8, -0.74, 0.74); ctx.stroke();
+           } else if (rIdx === 1) {
+-            ctx.beginPath(); ctx.roundRect(icX - 4.8, icY - 7.8, 9.6, 15.6, 2.2); ctx.fill(); ctx.stroke();
++            ctx.beginPath(); ctx.roundRect(icX - 4.5, icY - 7.5, 9, 15, 2); ctx.fill(); ctx.stroke();
+             ctx.beginPath();
+-            ctx.moveTo(icX - 8.2, icY - 4.2); ctx.lineTo(icX - 6.8, icY - 2); ctx.lineTo(icX - 8.2, icY); ctx.lineTo(icX - 6.8, icY + 2); ctx.lineTo(icX - 8.2, icY + 4.2);
+-            ctx.moveTo(icX + 8.2, icY - 4.2); ctx.lineTo(icX + 6.8, icY - 2); ctx.lineTo(icX + 8.2, icY); ctx.lineTo(icX + 6.8, icY + 2); ctx.lineTo(icX + 8.2, icY + 4.2);
++            ctx.moveTo(icX - 7.5, icY - 3.5); ctx.lineTo(icX - 6, icY - 1.5); ctx.lineTo(icX - 7.5, icY + 0.5);
++            ctx.moveTo(icX + 7.5, icY - 3.5); ctx.lineTo(icX + 6, icY - 1.5); ctx.lineTo(icX + 7.5, icY + 0.5);
+             ctx.stroke();
+           } else {
+             ctx.beginPath();
+-            ctx.moveTo(icX - 2.8, icY + 5.2); ctx.lineTo(icX - 2.8, icY - 5.8);
+-            ctx.lineTo(icX + 6.2, icY - 7.8); ctx.lineTo(icX + 6.2, icY + 3.2);
++            ctx.moveTo(icX - 2.5, icY + 5); ctx.lineTo(icX - 2.5, icY - 5.5);
++            ctx.lineTo(icX + 6, icY - 7.5); ctx.lineTo(icX + 6, icY + 3);
+             ctx.stroke();
+-            ctx.beginPath(); ctx.arc(icX - 5.4, icY + 5.2, 2.9, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+-            ctx.beginPath(); ctx.arc(icX + 3.6, icY + 3.2, 2.9, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
++            ctx.beginPath(); ctx.arc(icX - 5, icY + 5, 2.8, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
++            ctx.beginPath(); ctx.arc(icX + 3.5, icY + 3, 2.8, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+           }
+ 
+-          const tW = 72, tH = 32;
+-          const tX = pillX + pillW - tW - 12;
+-          const tY = rY + (rH - tH) * 0.5;
++          // 翡翠绿胶囊滑动开关
++          const tW = 68, tH = 30;
++          const tX = rowX + rowW - tW - 10;
++          const tY = rY + (rowH - tH) * 0.5;
+           const isOn = item.isOn;
+           ctx.beginPath();
+           ctx.roundRect(tX, tY, tW, tH, tH * 0.5);
+           const tg = ctx.createLinearGradient(tX, tY, tX, tY + tH);
+           if (isOn) {
+-            tg.addColorStop(0, '#8aa858');
+-            tg.addColorStop(1, '#6d8c3e');
++            tg.addColorStop(0, '#5ea834');
++            tg.addColorStop(1, '#448421');
+           } else {
+-            tg.addColorStop(0, '#cbb89d');
+-            tg.addColorStop(1, '#b8a284');
++            tg.addColorStop(0, '#c7b49a');
++            tg.addColorStop(1, '#ab967b');
+           }
+-          ctx.fillStyle = tg;
+-          ctx.fill();
+-          ctx.strokeStyle = '#f3b14b';
+-          ctx.lineWidth = 1.6;
+-          ctx.stroke();
++          ctx.fillStyle = tg; ctx.fill();
++          ctx.strokeStyle = '#f4d284'; ctx.lineWidth = 1.4; ctx.stroke();
+ 
+-          ctx.fillStyle = isOn ? '#ffffff' : '#6e5638';
+-          ctx.font = '900 12.5px "Fredoka", sans-serif';
++          ctx.fillStyle = isOn ? '#ffffff' : '#654f34';
++          ctx.font = '900 12px "Fredoka", sans-serif';
+           ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+-          ctx.fillText(isOn ? 'ON' : 'OFF', isOn ? (tX + 22) : (tX + tW - 22), tY + tH * 0.5 + 0.5);
++          ctx.fillText(isOn ? 'ON' : 'OFF', isOn ? (tX + 21) : (tX + tW - 21), tY + tH * 0.5 + 0.5);
+ 
+           const knobR = (tH - 6) * 0.5;
+           const knobX = isOn ? (tX + tW - knobR - 3.5) : (tX + knobR + 3.5);
+           const knobY = tY + tH * 0.5;
+           ctx.beginPath();
+           ctx.arc(knobX, knobY, knobR, 0, Math.PI * 2);
+-          ctx.fillStyle = '#ffffff';
+-          ctx.fill();
+-          ctx.strokeStyle = '#fde047';
+-          ctx.lineWidth = 1.2;
+-          ctx.stroke();
++          ctx.fillStyle = '#ffffff'; ctx.fill();
++          ctx.strokeStyle = '#fde047'; ctx.lineWidth = 1.2; ctx.stroke();
++          ctx.restore();
+ 
+-          registerHitRegion('toggle_' + rIdx, pillX, rY, pillW, rH, 220, () => {
++          registerHitRegion('toggle_' + rIdx, rowX, rY, rowW, rowH, 220, () => {
+             userSettings[item.key] = !userSettings[item.key];
+             playSound(userSettings[item.key] ? 'toggle_on' : 'toggle_off');
+           });
+-          ctx.restore();
+         });
+ 
+-        // 3 个功能卡片：倍速(1x/2x/3x)、主题、破局
+-        const featLabels = [`倍速x${speedMulStage}`, '主题', '破局'];
+-        const featY = rowsStartY + 3 * 52 + 6;
+-        const gap = 10;
+-        const fw = (pillW - gap * 2) / 3;
+-        const fh = 62;
++        // 5. 三个功能圆钮：倍速、主题商店、全部破局
++        const featLabels = [`倍速x${speedMulStage}`, '主题商店', '全部破局'];
++        const featY = rowStartY + 3 * (rowH + rowGap) + 4;
++        const fGap = 8;
++        const fw = (rowW - fGap * 2) / 3;
++        const fh = 56;
+         featLabels.forEach((fLbl, fIdx) => {
+-          const fx = pillX + fIdx * (fw + gap);
+-          const isFast = (fIdx === 0 && speedMulStage > 1);
+-          drawFig2CreamGoldPill(ctx, fx, featY, fw, fh, 16);
++          const fx = rowX + fIdx * (fw + fGap);
++          drawFig2CreamGoldPill(ctx, fx, featY, fw, fh, 14);
+ 
+           ctx.save();
+-          if (isFast) {
+-            ctx.beginPath(); ctx.roundRect(fx + 2, featY + 2, fw - 4, fh - 4, 14);
+-            ctx.fillStyle = speedMulStage === 3 ? 'rgba(251, 146, 60, 0.36)' : 'rgba(253, 224, 71, 0.35)';
+-            ctx.fill();
+-          }
+-          const icX = fx + fw * 0.5, icY = featY + 22;
++          const icX = fx + fw * 0.5, icY = featY + 20;
+           if (fIdx === 0) {
+             ctx.fillStyle = speedMulStage === 3 ? '#c2410c' : '#b45309';
+-            if (speedMulStage === 3) {
+-              [-9, -1, 7].forEach(dx => {
+-                ctx.beginPath(); ctx.moveTo(icX + dx - 3.5, icY - 5.5); ctx.lineTo(icX + dx + 3.5, icY); ctx.lineTo(icX + dx - 3.5, icY + 5.5); ctx.closePath(); ctx.fill();
+-              });
+-            } else {
+-              ctx.beginPath(); ctx.moveTo(icX - 8.5, icY - 5.5); ctx.lineTo(icX - 0.5, icY); ctx.lineTo(icX - 8.5, icY + 5.5); ctx.closePath(); ctx.fill();
+-              ctx.beginPath(); ctx.moveTo(icX + 0.5, icY - 5.5); ctx.lineTo(icX + 8.5, icY); ctx.lineTo(icX + 0.5, icY + 5.5); ctx.closePath(); ctx.fill();
+-            }
++            [-6, 0, 6].slice(0, speedMulStage).forEach(dx => {
++              ctx.beginPath(); ctx.moveTo(icX + dx - 3, icY - 5); ctx.lineTo(icX + dx + 3, icY); ctx.lineTo(icX + dx - 3, icY + 5); ctx.closePath(); ctx.fill();
++            });
+           } else if (fIdx === 1) {
+-            ctx.beginPath(); ctx.arc(icX, icY, 8.2, 0, Math.PI * 2);
++            ctx.beginPath(); ctx.arc(icX, icY, 7.5, 0, Math.PI * 2);
+             ctx.fillStyle = '#fde047'; ctx.fill();
+-            ctx.strokeStyle = '#7c3f0e'; ctx.lineWidth = 1.6; ctx.stroke();
+-            [[-3, -2, '#ea580c'], [3, -2, '#16a34a'], [0, 3, '#2563eb']].forEach(([dx, dy, col]) => {
+-              ctx.beginPath(); ctx.arc(icX + dx, icY + dy, 1.6, 0, Math.PI * 2); ctx.fillStyle = col; ctx.fill();
+-            });
++            ctx.strokeStyle = '#7c3f0e'; ctx.lineWidth = 1.4; ctx.stroke();
+           } else {
+-            drawStar5(ctx, icX, icY, 9.0, 4.0, '#facc15', '#7c3f0e', 1.5);
++            drawStar5(ctx, icX, icY, 8.0, 3.5, '#facc15', '#7c3f0e', 1.3);
+           }
+ 
+-          ctx.fillStyle = '#7c3f0e';
+-          ctx.font = '800 13px "Fredoka", "PingFang SC", "Microsoft YaHei", sans-serif';
++          ctx.fillStyle = '#6c3a10';
++          ctx.font = '800 12px "PingFang SC", "Microsoft YaHei", sans-serif';
+           ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+-          ctx.fillText(fLbl, fx + fw * 0.5, featY + fh - 14);
++          ctx.fillText(fLbl, fx + fw * 0.5, featY + fh - 13);
+           ctx.restore();
+ 
+           registerHitRegion('pause_feat_' + fIdx, fx, featY, fw, fh, 220, () => {
+@@ -8243,18 +8332,18 @@ const __outerGlobalRef = (typeof globalThis !== 'undefined' && globalThis) ? glo
+           });
+         });
+ 
+-        // 底部第1排：仅保留【主页】与【重新开始】（已移除跳过按钮）
+-        const row1Y = featY + fh + 14;
+-        const row1H = 52;
+-        const homeW = 92;
+-        draw3DGlossyModalButton(ctx, pillX, row1Y, homeW, row1H, 16, MODAL_BTN_PALETTES.goldSquare, '主页', 15);
+-        registerHitRegion('pause-home-btn', pillX, row1Y, homeW, row1H, 220, () => {
++        // 6. 底部双按钮：【选关主页】与【重新开始】
++        const row1Y = featY + fh + 12;
++        const row1H = 48;
++        const homeW = Math.round(rowW * 0.38);
++        draw3DGlossyModalButton(ctx, rowX, row1Y, homeW, row1H, 16, MODAL_BTN_PALETTES.goldSquare, '选关', 15);
++        registerHitRegion('pause-home-btn', rowX, row1Y, homeW, row1H, 220, () => {
+           openLevelSelector();
+         });
+ 
+-        const restartX = pillX + homeW + 12;
+-        const restartW = pillW - homeW - 12;
+-        draw3DGlossyModalButton(ctx, restartX, row1Y, restartW, row1H, 16, MODAL_BTN_PALETTES.green, '重新开始', 16.5);
++        const restartX = rowX + homeW + 10;
++        const restartW = rowW - homeW - 10;
++        draw3DGlossyModalButton(ctx, restartX, row1Y, restartW, row1H, 16, MODAL_BTN_PALETTES.green, '重新开始', 16);
+         registerHitRegion('pause-restart-btn', restartX, row1Y, restartW, row1H, 220, () => {
+           uiState.openModalId = null;
+           playSound('btn_restart');
+@@ -8262,9 +8351,11 @@ const __outerGlobalRef = (typeof globalThis !== 'undefined' && globalThis) ? glo
+           showToast('↻  当前关卡已重新开始');
+         });
+ 
++        // 7. 底部黄金大按钮：“返回主界面”
+         const row2Y = row1Y + row1H + 10;
+-        draw3DGlossyModalButton(ctx, pillX, row2Y, pillW, 50, 16, MODAL_BTN_PALETTES.amber, '继续游戏', 17);
+-        registerHitRegion('pause-resume-btn', pillX, row2Y, pillW, 50, 220, () => {
++        const row2H = Math.min(50, cardH * 0.092);
++        draw3DGlossyModalButton(ctx, rowX, row2Y, rowW, row2H, 18, MODAL_BTN_PALETTES.amber, '返回主界面', 17.5);
++        registerHitRegion('pause-resume-btn', rowX, row2Y, rowW, row2H, 220, () => {
+           uiState.openModalId = null;
+           playSound('modal_close');
+         });
+@@ -8621,31 +8712,39 @@ const __outerGlobalRef = (typeof globalThis !== 'undefined' && globalThis) ? glo
+         const r = layoutCache.centerLvTrigger;
+         const cx = r.left + r.width * 0.5;
+         const cy = r.top + 12;
+-        // 主关卡标题改为工坊木牌，保留可点击热区与原有关卡跳转。
+-        const plaque = makeRect(cx - 100, cy - 17, 200, 34);
++
++        const plaqueSp = designedUiSprites['top-plaque'];
++        const plaqueW = Math.min(220, Math.max(172, viewW * 0.48));
++        const plaqueH = plaqueW * (140 / 361);
++        const plaqueLeft = cx - plaqueW * 0.5;
++        const plaqueTop = cy - plaqueH * 0.5 - 2;
++
+         ctx.save();
+-        ctx.beginPath(); ctx.roundRect(plaque.left, plaque.top + 2, plaque.width, plaque.height, 13);
+-        ctx.fillStyle = 'rgba(42, 20, 7, 0.44)'; ctx.fill();
+-        ctx.beginPath(); ctx.roundRect(plaque.left, plaque.top, plaque.width, plaque.height, 13);
+-        const wood = ctx.createLinearGradient(0, plaque.top, 0, plaque.bottom);
+-        wood.addColorStop(0, '#bd7c3d'); wood.addColorStop(0.22, '#a76430');
+-        wood.addColorStop(0.72, '#85481f'); wood.addColorStop(1, '#693719');
+-        ctx.fillStyle = wood; ctx.fill();
+-        ctx.strokeStyle = '#e8bd70'; ctx.lineWidth = 2; ctx.stroke();
+-        ctx.beginPath(); ctx.roundRect(plaque.left + 3, plaque.top + 3, plaque.width - 6, plaque.height - 6, 10);
+-        ctx.strokeStyle = 'rgba(255, 225, 162, 0.38)'; ctx.lineWidth = 0.8; ctx.stroke();
+-        ctx.strokeStyle = 'rgba(255, 219, 159, 0.15)'; ctx.lineWidth = 1;
+-        ctx.beginPath(); ctx.moveTo(plaque.left + 18, plaque.top + 10); ctx.quadraticCurveTo(cx, plaque.top + 7, plaque.right - 18, plaque.top + 10); ctx.stroke();
++        if (plaqueSp) {
++          ctx.drawImage(plaqueSp, plaqueLeft, plaqueTop, plaqueW, plaqueH);
++        } else {
++          const plaque = makeRect(cx - 100, cy - 17, 200, 34);
++          ctx.beginPath(); ctx.roundRect(plaque.left, plaque.top + 2, plaque.width, plaque.height, 13);
++          ctx.fillStyle = 'rgba(42, 20, 7, 0.44)'; ctx.fill();
++          ctx.beginPath(); ctx.roundRect(plaque.left, plaque.top, plaque.width, plaque.height, 13);
++          const wood = ctx.createLinearGradient(0, plaque.top, 0, plaque.bottom);
++          wood.addColorStop(0, '#bd7c3d'); wood.addColorStop(0.22, '#a76430');
++          wood.addColorStop(0.72, '#85481f'); wood.addColorStop(1, '#693719');
++          ctx.fillStyle = wood; ctx.fill();
++          ctx.strokeStyle = '#e8bd70'; ctx.lineWidth = 2; ctx.stroke();
++        }
+         ctx.restore();
++
+         ctx.save();
+-        ctx.font = `900 ${Math.min(25, Math.max(20, Math.round(viewH * 0.029)))}px "PingFang SC", "Microsoft YaHei", "Fredoka", sans-serif`;
++        ctx.font = `900 ${Math.min(24, Math.max(18, Math.round(viewH * 0.027)))}px "PingFang SC", "Microsoft YaHei", "Fredoka", sans-serif`;
+         ctx.textAlign = 'center';
+         ctx.textBaseline = 'middle';
+-        ctx.lineWidth = 3;
+-        ctx.strokeStyle = 'rgba(67, 34, 14, 0.82)';
+-        ctx.strokeText(`第 ${currentLevelId} 关`, cx, cy + 0.5);
++        ctx.lineWidth = 3.5;
++        ctx.strokeStyle = 'rgba(67, 34, 14, 0.88)';
++        ctx.strokeText(`第 ${currentLevelId} 关`, cx, plaqueTop + plaqueH * 0.44 + 0.5);
+         ctx.fillStyle = '#fff4dc';
+-        ctx.fillText(`第 ${currentLevelId} 关`, cx, cy);
++        ctx.fillText(`第 ${currentLevelId} 关`, cx, plaqueTop + plaqueH * 0.44);
++        ctx.restore();
+ 
+         let goalTxt = '';
+         let goalIconType = 'bottle';
+@@ -8670,7 +8769,7 @@ const __outerGlobalRef = (typeof globalThis !== 'undefined' && globalThis) ? glo
+         const iconSpace = 18;
+         const gw = Math.max(146, textW + iconSpace + 28);
+         const gh = 22;
+-        const gy = cy + 29;
++        const gy = plaqueTop + plaqueH + 11;
+         const pillLeft = cx - gw * 0.5;
+ 
+         const progRect = makeRect(pillLeft, gy - gh * 0.5, gw, gh);
+@@ -8776,6 +8875,40 @@ const __outerGlobalRef = (typeof globalThis !== 'undefined' && globalThis) ? glo
+           }
+           registerHitRegion('bag_' + bIdx, r.left, r.top, r.width, r.height, 25, () => onBagClick(bIdx));
+         });
++
++        // 4B. 柜台实木陈列 VIP 金色药剂瓶（完美对应 design-image2 视觉设计）
++        const vipSp = designedUiSprites['gold-ad-bottle'];
++        if (vipSp && layoutCache.bagRects && layoutCache.bagRects.length > 0) {
++          const lastBag = layoutCache.bagRects[layoutCache.bagRects.length - 1];
++          const vipH = Math.min(84, Math.max(68, viewH * 0.092));
++          const vipW = vipH * (153 / 231);
++          const vipX = Math.min(viewW - vipW - 12, lastBag.right + 10);
++          const vipY = (activeThemeId === 'zen_amber' ? viewH * 0.284 : lastBag.bottom) - vipH;
++          const vipPulse = 1 + 0.028 * Math.sin(nowMs * 0.005);
++          ctx.save();
++          ctx.translate(vipX + vipW * 0.5, vipY + vipH * 0.5);
++          ctx.scale(vipPulse, vipPulse);
++          ctx.drawImage(vipSp, -vipW * 0.5, -vipH * 0.5, vipW, vipH);
++          ctx.restore();
++
++          // 柜台金色流光星芒微粒
++          for (let vk = 0; vk < 3; vk++) {
++            const vPhase = ((nowMs * 0.0012 + vk * 0.33) % 1.0);
++            const vAng = vk * 2.1 + nowMs * 0.003;
++            const vpx = vipX + vipW * 0.5 + Math.cos(vAng) * (vipW * 0.55);
++            const vpy = vipY + vipH * 0.85 - vPhase * (vipH * 0.7);
++            drawGlowingStar2D(ctx, vpx, vpy, 2.2 * Math.sin(vPhase * Math.PI), vAng, 0.75 * Math.sin(vPhase * Math.PI));
++          }
++
++          registerHitRegion('vip-gold-bottle', vipX - 4, vipY - 4, vipW + 8, vipH + 8, 30, () => {
++            playSound('pack');
++            if (typeof onAddBottleClick === 'function') {
++              onAddBottleClick();
++            } else {
++              showToast('✨ 金色 VIP 瓶：看广告可解锁备用试管！');
++            }
++          });
++        }
+       }
+ 
+       // 模式提示横幅
