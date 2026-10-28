@@ -479,8 +479,8 @@ const __outerGlobalRef = (typeof globalThis !== 'undefined' && globalThis) ? glo
     movesLeftNum: '',
     winBadgeText: '过关成功',
     scoreUserMoves: '0 步',
-    scoreOptMoves: '17 步',
-    scoreDiffMoves: '+0',
+    scoreOptMoves: '—',
+    scoreDiffMoves: '—',
     scorePraiseLine: '✨ 步数控制非常出色！',
     levelScrollTop: 0,
     shopScrollTop: 0,
@@ -957,6 +957,23 @@ const __outerGlobalRef = (typeof globalThis !== 'undefined' && globalThis) ? glo
     };
   }
 
+  function shuffleWithRng(items, rng) {
+    const shuffled = items.slice();
+    for (let i = shuffled.length - 1; i > 0; i--) {
+      const j = Math.floor(rng() * (i + 1));
+      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+    }
+    return shuffled;
+  }
+
+  function getScaledUnlockOrder(baseOrder, chapter) {
+    return Math.min(5, Math.max(1, baseOrder) + Math.min(2, Math.max(0, chapter - 1)));
+  }
+
+  function getLevelSeed(levelNum) {
+    return (Math.imul(levelNum, 2654435761) ^ 0x51ED270B) >>> 0;
+  }
+
   function buildVerifiedColorTubes(palette, cap, rng) {
     const n = palette.length;
     if (n <= 1) return [Array(cap).fill(palette[0])];
@@ -1165,7 +1182,7 @@ const __outerGlobalRef = (typeof globalThis !== 'undefined' && globalThis) ? glo
   ];
   window._handbookIdx = 0;
 
-  let currentLevelAttemptSeed = Math.floor(Math.random() * 1000000000);
+  let currentLevelAttemptSeed = getLevelSeed(1);
 
   const _levelConfigCache = new Map();
   function getLevelConfig(lv, attemptSeed = null) {
@@ -1198,7 +1215,7 @@ const __outerGlobalRef = (typeof globalThis !== 'undefined' && globalThis) ? glo
     // 前 3 关：纯享策略期（防死锁规范 4：确保开局至少 2 对明牌可合并顶层）
     if (levelNum === 1) {
       cfg.title = '第 1 关 · 新手试炼'; cfg.shortTag = '7色精粹'; cfg.hasBags = false; cfg.optimalMoves = 17;
-      const pal = COLOR_KEYS.slice().sort(() => rng() - 0.5).slice(0, 7);
+      const pal = shuffleWithRng(COLOR_KEYS, rng).slice(0, 7);
       const filled = ensureOpeningPairs(buildVerifiedColorTubes(pal, 4, rng), 2);
       cfg.bottles = () => [
         ...filled.map((layers, idx) => ({ id: idx, maxCap: 4, layers: layers.slice(), special: 'none' })),
@@ -1215,7 +1232,7 @@ const __outerGlobalRef = (typeof globalThis !== 'undefined' && globalThis) ? glo
       cfg.title = levelNum === 2 ? '第 2 关 · 礼盒打包' : '第 3 关 · 水色交错';
       cfg.shortTag = levelNum === 2 ? '8色礼盒' : '深层交错';
       cfg.hasBags = true; cfg.optimalMoves = levelNum === 2 ? 19 : 21;
-      const pal = COLOR_KEYS.slice().sort(() => rng() - 0.5).slice(0, 8);
+      const pal = shuffleWithRng(COLOR_KEYS, rng).slice(0, 8);
       const filled = ensureOpeningPairs(buildVerifiedColorTubes(pal, 4, rng), 2);
       const bagCol0 = filled[0][3];
       const bagCol1 = filled.map(t => t[3]).find(c => c !== bagCol0) || pal.find(c => c !== bagCol0);
@@ -1250,7 +1267,7 @@ const __outerGlobalRef = (typeof globalThis !== 'undefined' && globalThis) ? glo
 
     // ==================== Pos 5：章中 BOSS · 皇家灵猫瓶 ====================
     if (pos === 5) {
-      const shuffledAll = COLOR_KEYS.slice().sort(() => rng() - 0.5);
+      const shuffledAll = shuffleWithRng(COLOR_KEYS, rng);
       const catColorKey = shuffledAll[0];
       const otherColors = shuffledAll.slice(1, 5);
       cfg.title = `第 ${levelNum} 关 · 皇家灵猫瓶`; cfg.shortTag = '🐱灵猫典藏';
@@ -1263,7 +1280,7 @@ const __outerGlobalRef = (typeof globalThis !== 'undefined' && globalThis) ? glo
       const f3 = [catColorKey, subTubes[3][0], subTubes[3][1], subTubes[0][2]];
       const f4 = [catColorKey, subTubes[3][2], subTubes[3][3], subTubes[1][3]];
       const f5 = [subTubes[2][3], subTubes[0][3]];
-      const useMyst = chapter >= 2 ? 2 : 1;
+      const useMyst = chapter >= 2 ? 2 : 0;
       const useIce = chapter >= 2;
       const useOutAncient = chapter >= 3;
 
@@ -1288,7 +1305,7 @@ const __outerGlobalRef = (typeof globalThis !== 'undefined' && globalThis) ? glo
       cfg.hasBags = false; cfg.isVariedHeight = true; cfg.gridClass = 'layout-varied';
       cfg.optimalMoves = 20 + Math.min(8, Math.floor(chapter / 2));
 
-      const shuffledAll = COLOR_KEYS.slice().sort(() => rng() - 0.5);
+      const shuffledAll = shuffleWithRng(COLOR_KEYS, rng);
       const c2A = shuffledAll[0], c2B = shuffledAll[1];
       const c4A = shuffledAll[2], c4B = shuffledAll[3], c4C = shuffledAll[4];
       const c6A = shuffledAll[5], c6B = shuffledAll[6];
@@ -1297,17 +1314,18 @@ const __outerGlobalRef = (typeof globalThis !== 'undefined' && globalThis) ? glo
       const lockCol4 = tubes4[0][3] || c4A;
       const useColorLockHere = (pos === 3 && chapter >= 2);
       const useFunnelAndBombHere = (pos === 8 && levelNum >= 28);
+      const isFirstVariedHeight = levelNum === 8;
 
       // 铁律：绝不在装满杂色的瓶(B7)上挂 color_lock！将 color_lock 挂在空瓶 B9 上，并在异形色环局开放 B11 为免费空瓶，确保100%可解！
       cfg.bottles = () => [
         { id: 0, maxCap: 2, layers: [c2A, c2B], special: 'none' },
-        { id: 1, maxCap: 6, layers: tubes6[0].slice(0, 5), special: 'ice_base', poursToBreak: 1 },
-        { id: 2, maxCap: 4, layers: tubes4[0].slice(), special: 'none', mysteryCount: useFunnelAndBombHere ? 0 : 1, countdownMoves: useFunnelAndBombHere ? 9 : null },
-        { id: 3, maxCap: 6, layers: tubes6[1].slice(0, 5), special: 'none', mysteryCount: 2 },
+        { id: 1, maxCap: 6, layers: tubes6[0].slice(0, 5), special: isFirstVariedHeight ? 'none' : 'ice_base', poursToBreak: isFirstVariedHeight ? 0 : 1 },
+        { id: 2, maxCap: 4, layers: tubes4[0].slice(), special: 'none', mysteryCount: (useFunnelAndBombHere || isFirstVariedHeight) ? 0 : 1, countdownMoves: useFunnelAndBombHere ? 9 : null },
+        { id: 3, maxCap: 6, layers: tubes6[1].slice(0, 5), special: 'none', mysteryCount: isFirstVariedHeight ? 0 : 2 },
         { id: 4, maxCap: 2, layers: [c2B, c2A], special: 'none' },
-        { id: 5, maxCap: 4, layers: tubes4[1].slice(), special: 'stone_base', poursToBreak: 2 },
+        { id: 5, maxCap: 4, layers: tubes4[1].slice(), special: isFirstVariedHeight ? 'none' : 'stone_base', poursToBreak: isFirstVariedHeight ? 0 : 2 },
         { id: 6, maxCap: 2, layers: [], special: 'none' },
-        { id: 7, maxCap: 4, layers: tubes4[2].slice(), special: 'none', mysteryCount: 1 },
+        { id: 7, maxCap: 4, layers: tubes4[2].slice(), special: 'none', mysteryCount: isFirstVariedHeight ? 0 : 1 },
         { id: 8, maxCap: 6, layers: [tubes6[0][5], tubes6[1][5]], special: 'none' },
         { id: 9, maxCap: 4, layers: [], special: useColorLockHere ? 'color_lock' : 'none', requiredColor: useColorLockHere ? lockCol4 : null },
         { id: 10, maxCap: 6, layers: [], special: 'none' },
@@ -1322,7 +1340,7 @@ const __outerGlobalRef = (typeof globalThis !== 'undefined' && globalThis) ? glo
       cfg.shortTag = chapter >= 3 ? '8层+流沙' : '8层皇冠管';
       cfg.hasBags = false; cfg.gridClass = 'layout-tall8';
       cfg.optimalMoves = 24 + Math.min(10, Math.floor(chapter / 2));
-      const shuffledAll = COLOR_KEYS.slice().sort(() => rng() - 0.5);
+      const shuffledAll = shuffleWithRng(COLOR_KEYS, rng);
       const tallColors = shuffledAll.slice(0, 5);
       const tallTubes = ensureOpeningPairs(buildVerifiedColorTubes(tallColors, 8, rng), 1, [0, 2, 4]);
       // 确保第3支自由管 B4 顶层与 B0 次顶层同色，使得首轮合并后立刻衔接第2次合并，100%顺畅破除冰座与石座！
@@ -1344,11 +1362,11 @@ const __outerGlobalRef = (typeof globalThis !== 'undefined' && globalThis) ? glo
       }
 
       cfg.bottles = () => [
-        { id: 0, maxCap: 8, layers: tallTubes[0].slice(), special: 'none', mysteryCount: 2 },
-        { id: 1, maxCap: 8, layers: tallTubes[1].slice(), special: 'ice_base', poursToBreak: 1 },
-        { id: 2, maxCap: 8, layers: tallTubes[2].slice(), special: 'none', mysteryCount: 1, countdownMoves: chapter >= 3 ? 14 : null },
-        { id: 3, maxCap: 8, layers: tallTubes[3].slice(), special: 'stone_base', poursToBreak: 2 },
-        { id: 4, maxCap: 8, layers: tallTubes[4].slice(), special: 'none', mysteryCount: 1 },
+        { id: 0, maxCap: 8, layers: tallTubes[0].slice(), special: 'none', mysteryCount: levelNum === 9 ? 0 : 2 },
+        { id: 1, maxCap: 8, layers: tallTubes[1].slice(), special: levelNum === 9 ? 'none' : 'ice_base', poursToBreak: levelNum === 9 ? 0 : 1 },
+        { id: 2, maxCap: 8, layers: tallTubes[2].slice(), special: 'none', mysteryCount: levelNum === 9 ? 0 : 1, countdownMoves: chapter >= 3 ? 14 : null },
+        { id: 3, maxCap: 8, layers: tallTubes[3].slice(), special: levelNum === 9 ? 'none' : 'stone_base', poursToBreak: levelNum === 9 ? 0 : 2 },
+        { id: 4, maxCap: 8, layers: tallTubes[4].slice(), special: 'none', mysteryCount: levelNum === 9 ? 0 : 1 },
         { id: 5, maxCap: 8, layers: [], special: 'none' },
         { id: 6, maxCap: 8, layers: [], special: 'none' }
       ];
@@ -1360,7 +1378,7 @@ const __outerGlobalRef = (typeof globalThis !== 'undefined' && globalThis) ? glo
       cfg.title = `第 ${levelNum} 关 · 冰封王座局`; cfg.shortTag = '👑宗师试炼';
       cfg.hasBags = true; cfg.gridClass = 'layout-21';
       cfg.optimalMoves = 30 + Math.min(12, chapter);
-      const shuffledAll = COLOR_KEYS.slice().sort(() => rng() - 0.5);
+      const shuffledAll = shuffleWithRng(COLOR_KEYS, rng);
       const openPalette = shuffledAll.slice(0, 5);
       const lockedPalette = shuffledAll.slice(5, 8);
       const openTubes = ensureOpeningPairs(buildVerifiedColorTubes(openPalette, 4, rng), 2);
@@ -1381,23 +1399,23 @@ const __outerGlobalRef = (typeof globalThis !== 'undefined' && globalThis) ? glo
 
       cfg.bottles = () => [
         { id: 0, maxCap: 4, layers: openTubes[0].slice(0, 3), special: 'none' },
-        { id: 1, maxCap: 4, layers: openTubes[1].slice(), special: 'none', mysteryCount: 2, countdownMoves: useAdv3 ? 8 : null },
+        { id: 1, maxCap: 4, layers: openTubes[1].slice(), special: 'none', mysteryCount: chapter === 1 ? 0 : 2, countdownMoves: useAdv3 ? 8 : null },
         { id: 2, maxCap: 4, layers: openTubes[2].slice(), special: 'none' },
-        { id: 3, maxCap: 4, layers: lockedTubes[0].slice(), special: 'silk_drape', unlockOrder: 1 },
-        { id: 4, maxCap: 4, layers: openTubes[3].slice(), special: 'none', mysteryCount: 2 },
-        { id: 5, maxCap: 4, layers: openTubes[4].slice(), special: 'ice_base', poursToBreak: 2 },
+        { id: 3, maxCap: 4, layers: lockedTubes[0].slice(), special: chapter === 1 ? 'full_ice' : 'silk_drape', unlockOrder: getScaledUnlockOrder(1, chapter) },
+        { id: 4, maxCap: 4, layers: openTubes[3].slice(), special: 'none', mysteryCount: chapter === 1 ? 0 : 2 },
+        { id: 5, maxCap: 4, layers: openTubes[4].slice(), special: chapter === 1 ? 'none' : 'ice_base', poursToBreak: chapter === 1 ? 0 : 2 },
         { id: 6, maxCap: 4, layers: [openTubes[0][3]], special: useAdv3 ? 'one_way_out' : 'none' },
         { id: 7, maxCap: 4, layers: [], special: 'ad_cam' },
         { id: 8, maxCap: 4, layers: [cCyan, cPurple], special: 'none' },
-        { id: 9, maxCap: 4, layers: [cPurple, cCyan, cPink, cCyan], special: 'none', mysteryCount: 2 },
-        { id: 10, maxCap: 4, layers: lockedTubes[1].slice(), special: 'full_ice', unlockOrder: 2 },
+        { id: 9, maxCap: 4, layers: [cPurple, cCyan, cPink, cCyan], special: 'none', mysteryCount: chapter === 1 ? 0 : 2 },
+        { id: 10, maxCap: 4, layers: lockedTubes[1].slice(), special: chapter === 1 ? 'none' : 'full_ice', unlockOrder: getScaledUnlockOrder(2, chapter) },
         { id: 11, maxCap: 4, layers: [cPink, cPurple, cCyan], special: 'none' },
         { id: 12, maxCap: 4, layers: [cPink, cPink, cPurple], special: 'none' },
         { id: 13, maxCap: 4, layers: [], special: useAdv ? 'color_lock' : 'ad_cam', requiredColor: useAdv ? cRed : null },
         { id: 14, maxCap: 4, layers: [], special: 'none' },
-        { id: 15, maxCap: 4, layers: [cRed, cBlue, cRed, cBlue], special: 'none', mysteryCount: 2 },
-        { id: 16, maxCap: 4, layers: [cBlue, cRed, cBlue, cRed], special: 'stone_base', poursToBreak: 3 },
-        { id: 17, maxCap: 4, layers: lockedTubes[2].slice(), special: 'paper_bag', unlockOrder: 3 },
+        { id: 15, maxCap: 4, layers: [cRed, cBlue, cRed, cBlue], special: 'none', mysteryCount: chapter === 1 ? 0 : 2 },
+        { id: 16, maxCap: 4, layers: [cBlue, cRed, cBlue, cRed], special: 'stone_base', poursToBreak: chapter === 1 ? 1 : 3 },
+        { id: 17, maxCap: 4, layers: lockedTubes[2].slice(), special: chapter === 1 ? 'none' : 'paper_bag', unlockOrder: getScaledUnlockOrder(3, chapter) },
         { id: 18, maxCap: 4, layers: [], special: 'none' },
         { id: 19, maxCap: 4, layers: [], special: 'none' },
         { id: 20, maxCap: 4, layers: [], special: 'none' }
@@ -1407,7 +1425,7 @@ const __outerGlobalRef = (typeof globalThis !== 'undefined' && globalThis) ? glo
 
     // ==================== 常规与特色波浪关卡（Pos 1, 2, 4, 6, 7 及第 4, 6, 7, 12, 16, 22, 26 关） ====================
     cfg.hasBags = (pos === 2 || pos === 6 || pos === 7 || levelNum === 4);
-    const shuffledAll = COLOR_KEYS.slice().sort(() => rng() - 0.5);
+    const shuffledAll = shuffleWithRng(COLOR_KEYS, rng);
     const groupAColors = shuffledAll.slice(0, 6);
     const groupBColors = shuffledAll.slice(6, 8);
     const tubesA = ensureOpeningPairs(buildVerifiedColorTubes(groupAColors, 4, rng), 2);
@@ -1432,14 +1450,14 @@ const __outerGlobalRef = (typeof globalThis !== 'undefined' && globalThis) ? glo
       cfg.title = '第 26 关 · 星砂流沙怀表'; cfg.shortTag = '⏳流沙登场'; cfg.hasBags = true;
     } else if (pos === 4) {
       cfg.moveLimit = cfg.optimalMoves + 18;
-      cfg.title = `第 ${levelNum} 关 · ${levelNum >= 24 ? '星晷流沙双限' : '星晷限步局'}`;
-      cfg.shortTag = levelNum >= 24 ? `⏳限${cfg.moveLimit}步+流沙` : `✨限${cfg.moveLimit}步`;
+      cfg.title = `第 ${levelNum} 关 · ${levelNum >= 26 ? '星晷流沙双限' : '星晷限步局'}`;
+      cfg.shortTag = levelNum >= 26 ? `⏳限${cfg.moveLimit}步+流沙` : `✨限${cfg.moveLimit}步`;
     } else if (pos === 2) {
       cfg.title = `第 ${levelNum} 关 · 色环契约局`; cfg.shortTag = '🔒色环+星缎';
     } else if (pos === 6) {
       cfg.title = `第 ${levelNum} 关 · 漏斗缓冲谷`; cfg.shortTag = '⏬单向漏斗';
     } else if (pos === 7) {
-      cfg.title = `第 ${levelNum} 关 · 古瓶冰雕阵`; cfg.shortTag = levelNum >= 17 ? '⏫古瓶+冰雕' : '❄ 极光冰雕';
+      cfg.title = `第 ${levelNum} 关 · 古瓶冰雕阵`; cfg.shortTag = levelNum >= 27 ? '⏫古瓶+冰雕' : '❄ 极光冰雕';
     } else {
       cfg.title = `第 ${levelNum} 关 · 水色交错`; cfg.shortTag = chapter >= 3 ? '⏫古瓶+星雾' : '深层星雾';
     }
@@ -1462,12 +1480,12 @@ const __outerGlobalRef = (typeof globalThis !== 'undefined' && globalThis) ? glo
       // 第 4 关：星雾盲盒首次登场
       if (levelNum === 4) {
         return [
-          { id: 0, maxCap: 4, layers: tubesA[0].slice(), special: 'none', mysteryCount: 2 },
-          { id: 1, maxCap: 4, layers: tubesA[1].slice(), special: 'none', mysteryCount: 2 },
-          { id: 2, maxCap: 4, layers: tubesA[2].slice(), special: 'none', mysteryCount: 2 },
-          { id: 3, maxCap: 4, layers: tubesA[3].slice(), special: 'none', mysteryCount: 2 },
-          { id: 4, maxCap: 4, layers: tubesA[4].slice(), special: 'none', mysteryCount: 2 },
-          { id: 5, maxCap: 4, layers: tubesA[5].slice(), special: 'none', mysteryCount: 1 },
+          { id: 0, maxCap: 4, layers: tubesA[0].slice(), special: 'none', mysteryCount: 1 },
+          { id: 1, maxCap: 4, layers: tubesA[1].slice(), special: 'none' },
+          { id: 2, maxCap: 4, layers: tubesA[2].slice(), special: 'none' },
+          { id: 3, maxCap: 4, layers: tubesA[3].slice(), special: 'none', mysteryCount: 1 },
+          { id: 4, maxCap: 4, layers: tubesA[4].slice(), special: 'none' },
+          { id: 5, maxCap: 4, layers: tubesA[5].slice(), special: 'none' },
           { id: 6, maxCap: 4, layers: tubesB[0].slice(), special: 'none', mysteryCount: 1 },
           { id: 7, maxCap: 4, layers: tubesB[1].slice(), special: 'none' },
           { id: 8, maxCap: 4, layers: [], special: 'none' },
@@ -1480,12 +1498,12 @@ const __outerGlobalRef = (typeof globalThis !== 'undefined' && globalThis) ? glo
       // 第 6 关：极地霜晶底座首次登场
       if (levelNum === 6) {
         return [
-          { id: 0, maxCap: 4, layers: tubesA[0].slice(), special: 'none', mysteryCount: 1 },
+          { id: 0, maxCap: 4, layers: tubesA[0].slice(), special: 'none' },
           { id: 1, maxCap: 4, layers: tubesA[1].slice(), special: 'ice_base', poursToBreak: 1 },
-          { id: 2, maxCap: 4, layers: tubesA[2].slice(), special: 'none', mysteryCount: 1 },
-          { id: 3, maxCap: 4, layers: tubesA[3].slice(), special: 'ice_base', poursToBreak: 2 },
-          { id: 4, maxCap: 4, layers: tubesA[4].slice(), special: 'none', mysteryCount: 1 },
-          { id: 5, maxCap: 4, layers: tubesA[5].slice(), special: 'ice_base', poursToBreak: 2 },
+          { id: 2, maxCap: 4, layers: tubesA[2].slice(), special: 'none' },
+          { id: 3, maxCap: 4, layers: tubesA[3].slice(), special: 'none' },
+          { id: 4, maxCap: 4, layers: tubesA[4].slice(), special: 'none' },
+          { id: 5, maxCap: 4, layers: tubesA[5].slice(), special: 'none' },
           { id: 6, maxCap: 4, layers: tubesB[0].slice(), special: 'none' },
           { id: 7, maxCap: 4, layers: tubesB[1].slice(), special: 'none' },
           { id: 8, maxCap: 4, layers: [], special: 'none' },
@@ -1498,14 +1516,14 @@ const __outerGlobalRef = (typeof globalThis !== 'undefined' && globalThis) ? glo
       // 第 7 关：星缎礼袍首次登场
       if (levelNum === 7) {
         return [
-          { id: 0, maxCap: 4, layers: tubesA[0].slice(), special: 'none', mysteryCount: 1 },
-          { id: 1, maxCap: 4, layers: tubesA[1].slice(), special: 'ice_base', poursToBreak: 1 },
-          { id: 2, maxCap: 4, layers: tubesA[2].slice(), special: 'none', mysteryCount: 1 },
-          { id: 3, maxCap: 4, layers: tubesA[3].slice(), special: 'none', mysteryCount: 1 },
-          { id: 4, maxCap: 4, layers: tubesA[4].slice(), special: 'ice_base', poursToBreak: 2 },
+          { id: 0, maxCap: 4, layers: tubesA[0].slice(), special: 'none' },
+          { id: 1, maxCap: 4, layers: tubesA[1].slice(), special: 'none' },
+          { id: 2, maxCap: 4, layers: tubesA[2].slice(), special: 'none' },
+          { id: 3, maxCap: 4, layers: tubesA[3].slice(), special: 'none' },
+          { id: 4, maxCap: 4, layers: tubesA[4].slice(), special: 'none' },
           { id: 5, maxCap: 4, layers: tubesA[5].slice(), special: 'none' },
           { id: 6, maxCap: 4, layers: tubesB[0].slice(), special: 'silk_drape', unlockOrder: 1 },
-          { id: 7, maxCap: 4, layers: tubesB[1].slice(), special: 'silk_drape', unlockOrder: 2 },
+          { id: 7, maxCap: 4, layers: tubesB[1].slice(), special: 'none' },
           { id: 8, maxCap: 4, layers: [], special: 'none' },
           { id: 9, maxCap: 4, layers: [], special: 'none' },
           { id: 10, maxCap: 4, layers: [], special: 'ad_cam' },
@@ -1516,13 +1534,13 @@ const __outerGlobalRef = (typeof globalThis !== 'undefined' && globalThis) ? glo
       // 第 12 关 & 所有后续 Pos 2（除第22关外）：🔒 专属色环契约局（防死锁规范 10：1只色环空瓶 + 2只通用免费空瓶）
       if (pos === 2 && levelNum !== 22) {
         return [
-          { id: 0, maxCap: 4, layers: tubesA[0].slice(), special: 'none', mysteryCount: 1 },
-          { id: 1, maxCap: 4, layers: tubesA[1].slice(), special: 'ice_base', poursToBreak: 1 },
-          { id: 2, maxCap: 4, layers: tubesA[2].slice(), special: 'none', mysteryCount: 1 },
-          { id: 3, maxCap: 4, layers: tubesA[3].slice(), special: 'none', mysteryCount: 1 },
+          { id: 0, maxCap: 4, layers: tubesA[0].slice(), special: 'none', mysteryCount: levelNum === 12 ? 0 : 1 },
+          { id: 1, maxCap: 4, layers: tubesA[1].slice(), special: levelNum === 12 ? 'none' : 'ice_base', poursToBreak: levelNum === 12 ? 0 : 1 },
+          { id: 2, maxCap: 4, layers: tubesA[2].slice(), special: 'none', mysteryCount: levelNum === 12 ? 0 : 1 },
+          { id: 3, maxCap: 4, layers: tubesA[3].slice(), special: 'none', mysteryCount: levelNum === 12 ? 0 : 1 },
           { id: 4, maxCap: 4, layers: tubesA[4].slice(), special: 'none' },
           { id: 5, maxCap: 4, layers: tubesA[5].slice(), special: 'none' },
-          { id: 6, maxCap: 4, layers: tubesB[0].slice(), special: 'silk_drape', unlockOrder: 1 },
+          { id: 6, maxCap: 4, layers: tubesB[0].slice(), special: levelNum === 12 ? 'none' : 'silk_drape', unlockOrder: getScaledUnlockOrder(1, chapter) },
           { id: 7, maxCap: 4, layers: tubesB[1].slice(), special: 'none' },
           { id: 8, maxCap: 4, layers: [], special: 'color_lock', requiredColor: topExposedColor },
           { id: 9, maxCap: 4, layers: [], special: 'none' },
@@ -1536,30 +1554,30 @@ const __outerGlobalRef = (typeof globalThis !== 'undefined' && globalThis) ? glo
         const hasBombHere = (levelNum >= 26);
         return [
           { id: 0, maxCap: 4, layers: tubesA[0].slice(), special: 'none', countdownMoves: hasBombHere ? 8 : null },
-          { id: 1, maxCap: 4, layers: tubesA[1].slice(), special: 'none', mysteryCount: 1 },
-          { id: 2, maxCap: 4, layers: tubesA[2].slice(), special: 'none', mysteryCount: (levelNum >= 36) ? 0 : 1, countdownMoves: (levelNum >= 36) ? 10 : null },
-          { id: 3, maxCap: 4, layers: tubesA[3].slice(), special: 'none', mysteryCount: 1 },
+          { id: 1, maxCap: 4, layers: tubesA[1].slice(), special: 'none', mysteryCount: (levelNum === 16 || levelNum === 26 || levelNum >= 36) ? 0 : 1 },
+          { id: 2, maxCap: 4, layers: tubesA[2].slice(), special: 'none', mysteryCount: (levelNum === 16 || levelNum === 26 || levelNum >= 36) ? 0 : 1, countdownMoves: (levelNum >= 36) ? 10 : null },
+          { id: 3, maxCap: 4, layers: tubesA[3].slice(), special: 'none', mysteryCount: (levelNum === 16 || levelNum === 26) ? 0 : 1 },
           { id: 4, maxCap: 4, layers: tubesA[4].slice(), special: 'none' },
           { id: 5, maxCap: 4, layers: tubesA[5].slice(1), special: 'none' },
-          { id: 6, maxCap: 4, layers: tubesB[0].slice(), special: 'paper_bag', unlockOrder: 1 },
+          { id: 6, maxCap: 4, layers: tubesB[0].slice(), special: (levelNum === 16 || levelNum === 26) ? 'none' : 'paper_bag', unlockOrder: getScaledUnlockOrder(1, chapter) },
           { id: 7, maxCap: 4, layers: tubesB[1].slice(), special: 'none' },
-          { id: 8, maxCap: 4, layers: [tubesA[5][0]], special: 'one_way_in' },
+          { id: 8, maxCap: 4, layers: [tubesA[5][0]], special: levelNum === 26 ? 'none' : 'one_way_in' },
           { id: 9, maxCap: 4, layers: [], special: 'none' },
           { id: 10, maxCap: 4, layers: [], special: 'none' },
           { id: 11, maxCap: 4, layers: [], special: 'ad_cam' }
         ];
       }
 
-      // 第 22 关 & Pos 7（levelNum >= 17）：⏫ 单向出水古瓶局（消除鸽巢原理死锁：仅 B0 为单向古瓶，B1 破冰仅需1次合并，确保6种颜色拥有充足可接水瓶位！）
-      if (levelNum === 22 || (pos === 7 && levelNum >= 17)) {
+      // 第 22 关首次教学；第 27 关后再进入单向出水瓶与冰封机关的组合局。
+      if (levelNum === 22 || (pos === 7 && levelNum >= 27)) {
         return [
           { id: 0, maxCap: 4, layers: tubesA[0].slice(), special: 'one_way_out' },
-          { id: 1, maxCap: 4, layers: tubesA[1].slice(), special: 'ice_base', poursToBreak: 1 },
+          { id: 1, maxCap: 4, layers: tubesA[1].slice(), special: levelNum === 22 ? 'none' : 'ice_base', poursToBreak: levelNum === 22 ? 0 : 1 },
           { id: 2, maxCap: 4, layers: tubesA[2].slice(), special: 'none' },
-          { id: 3, maxCap: 4, layers: tubesA[3].slice(), special: 'none', mysteryCount: 1 },
-          { id: 4, maxCap: 4, layers: tubesA[4].slice(), special: 'none', mysteryCount: 1 },
+          { id: 3, maxCap: 4, layers: tubesA[3].slice(), special: 'none', mysteryCount: levelNum === 22 ? 0 : 1 },
+          { id: 4, maxCap: 4, layers: tubesA[4].slice(), special: 'none', mysteryCount: levelNum === 22 ? 0 : 1 },
           { id: 5, maxCap: 4, layers: tubesA[5].slice(), special: 'none' },
-          { id: 6, maxCap: 4, layers: tubesB[0].slice(), special: 'full_ice', unlockOrder: 1 },
+          { id: 6, maxCap: 4, layers: tubesB[0].slice(), special: levelNum === 22 ? 'none' : 'full_ice', unlockOrder: getScaledUnlockOrder(1, chapter) },
           { id: 7, maxCap: 4, layers: tubesB[1].slice(), special: 'none' },
           { id: 8, maxCap: 4, layers: [], special: 'none' },
           { id: 9, maxCap: 4, layers: [], special: 'none' },
@@ -1569,8 +1587,8 @@ const __outerGlobalRef = (typeof globalThis !== 'undefined' && globalThis) ? glo
       }
 
       // Pos 4（第一波峰 · 双重倒计时）& Pos 1（起势局）
-      const useBombInPos4 = (pos === 4 && levelNum >= 24);
-      const useAncientInPos1 = (pos === 1 && chapter >= 3);
+      const useBombInPos4 = (pos === 4 && levelNum >= 26);
+      const useAncientInPos1 = (pos === 1 && chapter >= 4);
       return [
         { id: 0, maxCap: 4, layers: tubesA[0].slice(), special: useAncientInPos1 ? 'one_way_out' : 'none', mysteryCount: (useAncientInPos1 || useBombInPos4) ? 0 : 2, countdownMoves: useBombInPos4 ? 8 : null },
         { id: 1, maxCap: 4, layers: tubesA[1].slice(), special: 'none', mysteryCount: 1 },
@@ -1592,6 +1610,7 @@ const __outerGlobalRef = (typeof globalThis !== 'undefined' && globalThis) ? glo
   let currentLevelId = 1;
   let currentChapterTab = 0;
   let remainingMoves = null;
+  let currentRunMoveFloor = 1;
   let bottles = [];
   let bags = [];
   let packedTotal = 0;
@@ -2472,7 +2491,7 @@ const __outerGlobalRef = (typeof globalThis !== 'undefined' && globalThis) ? glo
     }
 
     const cap = b.maxCap || 4;
-    // 规范 3：高低异形瓶（2/4/6层混排）全局同色余量校验与容量智能自适应（彻底解决图1中2层紫水装在6层高瓶中无法封存的痛点！）
+    // 异形容量瓶只在装满自身容量后封存，容量不会在游玩中暗中变化。
     if (cfg.isVariedHeight) {
       let otherSameCount = 0;
       bottles.forEach(other => {
@@ -2481,21 +2500,6 @@ const __outerGlobalRef = (typeof globalThis !== 'undefined' && globalThis) ? glo
       });
       if (otherSameCount > 0) {
         return false;
-      }
-      // 若场上该颜色的所有水层已100%汇聚在此瓶中 (otherSameCount === 0)，但当前瓶容量偏大 (如2层水在6层瓶中)：
-      // 自动与场上一只容量为 b.layers.length 的未封存瓶互换器型容量，使本瓶立即满瓶落塞，同时场上高瓶/矮瓶总数100%守恒！
-      if (b.layers.length !== cap && b.layers.length >= 2) {
-        const targetLen = b.layers.length;
-        const swapPartner = bottles.find(other =>
-          other !== b && !other.removed && !other.corked &&
-          (other.maxCap || 4) === targetLen &&
-          other.layers.length <= targetLen
-        );
-        if (swapPartner) {
-          swapPartner.maxCap = cap;
-          b.maxCap = targetLen;
-          return true;
-        }
       }
     }
 
@@ -4093,17 +4097,53 @@ const __outerGlobalRef = (typeof globalThis !== 'undefined' && globalThis) ? glo
     }
   }
 
+  function computeRunMoveLowerBound(levelBottles) {
+    const colorCounts = new Map();
+    const colorRuns = new Map();
+    const maxTargetCapacity = new Map();
+
+    (levelBottles || []).forEach(b => {
+      if (!b || b.removed) return;
+      const capacity = Math.max(1, b.maxCap || 4);
+      const canFinish = true; // 单向出水瓶排空后会转为普通瓶，仍可作为最终容量位。
+      if (b.isGiantCat) {
+        if (b.catTargetColor) maxTargetCapacity.set(b.catTargetColor, Math.max(maxTargetCapacity.get(b.catTargetColor) || 0, capacity));
+      } else if (canFinish) {
+        if (b.special !== 'color_lock' || !b.requiredColor) {
+          COLOR_KEYS.forEach(color => maxTargetCapacity.set(color, Math.max(maxTargetCapacity.get(color) || 0, capacity)));
+        } else {
+          maxTargetCapacity.set(b.requiredColor, Math.max(maxTargetCapacity.get(b.requiredColor) || 0, capacity));
+        }
+      }
+
+      let previous = null;
+      (b.layers || []).forEach(color => {
+        colorCounts.set(color, (colorCounts.get(color) || 0) + 1);
+        if (color !== previous) colorRuns.set(color, (colorRuns.get(color) || 0) + 1);
+        previous = color;
+      });
+    });
+
+    let segmentCount = 0;
+    let minimumGroups = 0;
+    colorCounts.forEach((count, color) => {
+      segmentCount += colorRuns.get(color) || 0;
+      const capacity = Math.max(1, maxTargetCapacity.get(color) || 4);
+      minimumGroups += Math.ceil(count / capacity);
+    });
+    return Math.max(1, segmentCount - minimumGroups);
+  }
+
   function showWinModal(wasGiantCat) {
     streakWins = (streakWins || 0) + 1;
-    const cfg = getLevelConfig(currentLevelId);
     const userSteps = Math.max(1, pourCountTotal);
-    const optSteps = cfg.optimalMoves || 17;
-    const diff = Math.max(0, userSteps - optSteps);
+    const floorSteps = currentRunMoveFloor || 1;
+    const diff = Math.max(0, userSteps - floorSteps);
 
     uiState.winBadgeText = wasGiantCat ? '灵猫典藏通关' : '完美通关';
     uiState.scoreUserMoves = `${userSteps} 步`;
-    uiState.scoreOptMoves = `${optSteps} 步`;
-    uiState.scoreDiffMoves = diff === 0 ? '完美零差' : `+${diff} 步`;
+    uiState.scoreOptMoves = `${floorSteps} 步`;
+    uiState.scoreDiffMoves = diff === 0 ? '达到下限' : `高于 ${diff} 步`;
     uiState.winModalOpenTime = performance.now();
     uiState.winLastFireworkMs = performance.now();
     uiState.winStreakCount = streakWins;
@@ -4114,8 +4154,8 @@ const __outerGlobalRef = (typeof globalThis !== 'undefined' && globalThis) ? glo
       uiState.scoreEncourageSub = '万众瞩目的王牌关卡都被你轻松拿下，为你喝彩！';
     } else if (diff === 0) {
       uiState.winHonorTag = '👑 零失误神级操作 · 传奇炼金宗师';
-      uiState.scorePraiseLine = '🏆 太神了！分毫不差达成理论最少步数！';
-      uiState.scoreEncourageSub = '教科书般的精准预判，你就是天生的色彩大师！';
+      uiState.scorePraiseLine = '🏆 太神了！达成本局结构步数下限！';
+      uiState.scoreEncourageSub = '你的整理思路非常高效，继续保持这份节奏！';
     } else if (diff <= 3) {
       uiState.winHonorTag = streakWins >= 2 ? `🔥 ${streakWins}连胜达成 · 首席秘药大师` : '🌟 炉火纯青 · 皇家秘药大师';
       uiState.scorePraiseLine = '🌟 操作行云流水，步数控制极其惊艳！';
@@ -4143,14 +4183,22 @@ const __outerGlobalRef = (typeof globalThis !== 'undefined' && globalThis) ? glo
   function initGame() {
     stopSelectSloshAnimation();
     if (entranceSloshRaf) cancelAnimationFrame(entranceSloshRaf);
-    currentLevelAttemptSeed = Math.floor(Math.random() * 1000000000);
+    currentLevelAttemptSeed = getLevelSeed(currentLevelId);
     const cfg = getLevelConfig(currentLevelId);
     bottles = cfg.bottles();
+    currentRunMoveFloor = computeRunMoveLowerBound(bottles);
     bags = cfg.hasBags ? JSON.parse(JSON.stringify(cfg.bags)) : [];
     const filledCapsTotal = bottles.reduce((acc, b) => acc + (b && !b.isGiantCat && b.layers && b.layers.length > 0 ? 1 : 0), 0);
     const totalLiquidLayers = bottles.reduce((acc, b) => acc + (b && b.layers ? b.layers.length : 0), 0);
     levelTargetTotalBottles = cfg.isCatBossLevel ? 8 : Math.max(1, cfg.isVariedHeight ? filledCapsTotal : Math.round(totalLiquidLayers / (bottles[0]?.maxCap || 4)));
-    remainingMoves = cfg.moveLimit;
+    const configuredMoveLimit = cfg.baseMoveLimit !== undefined ? cfg.baseMoveLimit : cfg.moveLimit;
+    cfg.baseMoveLimit = configuredMoveLimit;
+    const moveBudgetMargin = Math.max(12, (configuredMoveLimit || 0) - (cfg.optimalMoves || 17));
+    remainingMoves = configuredMoveLimit === null ? null : currentRunMoveFloor + moveBudgetMargin;
+    if (remainingMoves !== null) {
+      cfg.moveLimit = remainingMoves;
+      cfg.shortTag = currentLevelId >= 26 ? `⏳限${remainingMoves}步+流沙` : `✨限${remainingMoves}步`;
+    }
     packedTotal = 0;
     pourCountTotal = 0;
     selectedIndex = null;
@@ -7878,8 +7926,8 @@ const __outerGlobalRef = (typeof globalThis !== 'undefined' && globalThis) ? glo
         ctx.save();
         const cols = [
           ['本次用步', uiState.scoreUserMoves || '1 步', '#7c3f0e'],
-          ['理论最优解', uiState.scoreOptMoves || '17 步', '#15803d'],
-          ['最优解评价', uiState.scoreDiffMoves || '完美零差', '#d97706']
+          ['结构步数下限', uiState.scoreOptMoves || '—', '#15803d'],
+          ['高于下限', uiState.scoreDiffMoves || '—', '#d97706']
         ];
         cols.forEach(([lbl, val, col], i) => {
           const cx = pillX + pillW * ((i * 2 + 1) / 6);
