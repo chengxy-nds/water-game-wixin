@@ -1613,7 +1613,7 @@ const __outerGlobalRef = (typeof globalThis !== 'undefined' && globalThis) ? glo
   const shownMechanicIntros = new Set();
 
   const SHOP_THEMES = [
-    { id: 'zen_amber', name: '晨曦流金', unlocked: true, unlockType: 'free', topCol: '#e49f42', botCol: '#7c8554' },
+    { id: 'zen_amber', name: '秘药工坊', unlocked: true, unlockType: 'free', topCol: '#b87333', botCol: '#75451f' },
     { id: 'starlight', name: '深邃星夜', unlocked: true, unlockType: 'free', topCol: '#191d52', botCol: '#090b24' },
     { id: 'volcanic', name: '火山灰', unlocked: true, unlockType: 'free', topCol: '#b8bac8', botCol: '#8d90a3' },
     { id: 'taro', name: '香芋紫', unlocked: false, unlockType: 'lv10', topCol: '#dcd0f0', botCol: '#c2b0e2' },
@@ -2085,7 +2085,7 @@ const __outerGlobalRef = (typeof globalThis !== 'undefined' && globalThis) ? glo
     const botUsed = safeB + 86;
     const stageTop = topUsed + 6;
     const stageH = Math.max(240, H - topUsed - botUsed - 12);
-    const stageCy = stageTop + stageH * 0.5;
+    let stageCy = stageTop + stageH * 0.5;
 
     const cls = ((stageLayout && stageLayout.gridClass) || '') + (userSettings.zoom ? ' zoomed-stage' : '');
     const isZoomed = !!userSettings.zoom;
@@ -2095,12 +2095,19 @@ const __outerGlobalRef = (typeof globalThis !== 'undefined' && globalThis) ? glo
 
     const padX = 8;
     const availW = shellW - padX * 2;
-    let cols = 6, rows = 2, colGap = 7, rowGap = Math.min(48, Math.max(32, H * 0.056));
+    let cols = 6, rows = 2, colGap = 7, rowGap = activeThemeId === 'zen_amber' ? Math.min(16, Math.max(8, H * 0.012)) : Math.min(48, Math.max(32, H * 0.056));
     if (cls.includes('layout-5col')) { cols = 5; rows = Math.ceil(totalSlots / 5); colGap = 10; }
     else if (cls.includes('layout-tall8')) { cols = 7; rows = 1; colGap = 4; }
     else if (cls.includes('layout-cat-boss')) { cols = 7; rows = 2; colGap = 4; rowGap = Math.min(40, Math.max(28, H * 0.048)); }
     else if (cls.includes('layout-21')) { cols = 7; rows = 3; colGap = 2; rowGap = Math.min(20, Math.max(12, H * 0.022)); }
     else { cols = 6; rows = Math.max(1, Math.ceil(totalSlots / 6)); }
+
+    // 工坊背景自带三层木货架：把瓶阵按行落在货架上，避免继续悬浮在屏幕几何中心。
+    if (activeThemeId === 'zen_amber') {
+      if (cls.includes('layout-21')) stageCy = H * 0.63;
+      else if (cls.includes('layout-tall8')) stageCy = H * 0.67;
+      else stageCy = H * (rows >= 3 ? 0.62 : 0.70);
+    }
 
     const cellW = (availW - colGap * (cols - 1)) / cols;
 
@@ -2127,11 +2134,12 @@ const __outerGlobalRef = (typeof globalThis !== 'undefined' && globalThis) ? glo
       return makeRect(left, top, stdSlotW, stdSlotH);
     }
 
-    let aspectW = 67, aspectH = 204, maxSlotW = 62, maxSlotH = Math.min(182, Math.max(128, H * 0.235));
+    let aspectW = 67, aspectH = 204, maxSlotW = 62, maxSlotH = activeThemeId === 'zen_amber' ? Math.min(170, Math.max(128, H * 0.22)) : Math.min(182, Math.max(128, H * 0.235));
     if (cls.includes('layout-tall8') || (b && (b.maxCap || 4) >= 8)) {
       aspectW = 70; aspectH = 298; maxSlotW = 60; maxSlotH = Math.min(268, Math.max(176, H * 0.36));
     } else if (cls.includes('layout-21')) {
-      maxSlotW = 52; maxSlotH = Math.min(148, Math.max(106, H * 0.175));
+      maxSlotW = activeThemeId === 'zen_amber' ? 46 : 52;
+      maxSlotH = activeThemeId === 'zen_amber' ? Math.min(138, Math.max(100, H * 0.16)) : Math.min(148, Math.max(106, H * 0.175));
     }
 
     let customAspectH = aspectH;
@@ -2192,8 +2200,13 @@ const __outerGlobalRef = (typeof globalThis !== 'undefined' && globalThis) ? glo
       const slotW = Math.min(76, (bagAreaW - gap * 3) / 4);
       const totalW = slotW * 4 + gap * 3;
       const startX = shellX + (shellW - totalW) * 0.5;
-      const bagH = Math.min(112, Math.max(90, H * 0.132));
-      const bagTop = headerBottomY;
+      const bagH = activeThemeId === 'zen_amber'
+        ? Math.min(100, Math.max(84, H * 0.112))
+        : Math.min(112, Math.max(90, H * 0.132));
+      // 工坊袋子固定落在背景最上层柜台：用台面底边作为锚点，不随关卡瓶数移动。
+      const bagTop = activeThemeId === 'zen_amber'
+        ? H * 0.314 - bagH
+        : headerBottomY;
       const bagCount = Math.max(4, bags ? bags.length : 4);
       for (let i = 0; i < bagCount; i++) {
         bagRects.push(makeRect(startX + i * (slotW + gap), bagTop, slotW, bagH));
@@ -2252,7 +2265,7 @@ const __outerGlobalRef = (typeof globalThis !== 'undefined' && globalThis) ? glo
       shellRect: makeRect(shellX, 0, shellW, H),
       settingsBtn: makeRect(shellX + 12, topBtnY, topBtnSize, topBtnSize),
       rulesBtn: makeRect(shellX + 12 + topBtnSize + 8, topBtnY, topBtnSize, topBtnSize),
-      centerLvTrigger: makeRect(shellX + shellW * 0.5 - 76, topBtnY - 2, 152, 50),
+      centerLvTrigger: makeRect(shellX + shellW * 0.5 - 96, topBtnY + 48, 192, 54),
       modeBanner: makeRect(shellX + 16, bannerTop, shellW - 32, 34),
       modeBannerProg: makeRect(shellX + 178, bannerTop + 6, 68, 22),
       movesCounterPill: makeRect(shellX + shellW - 16 - 92, bannerTop + 4, 88, 26),
@@ -4483,6 +4496,25 @@ const __outerGlobalRef = (typeof globalThis !== 'undefined' && globalThis) ? glo
     bgOffscreenDirty = true;
     lastRenderedThemeId = null;
 
+    // 真实工坊货架背景来自 design-image/详细设计/image copy 2.png；原图已复制到无空格的小游戏资源路径。
+    let workshopBackdrop = null;
+    let workshopBackdropReady = false;
+    try {
+      if (nativeApi && typeof nativeApi.createImage === 'function') workshopBackdrop = nativeApi.createImage();
+      else if (typeof _g.Image === 'function') workshopBackdrop = new _g.Image();
+      if (workshopBackdrop) {
+        workshopBackdrop.onload = () => {
+          workshopBackdropReady = true;
+          bgOffscreenDirty = true;
+          lastRenderedThemeId = null;
+          window._bgOffscreenDirty = true;
+        };
+        workshopBackdrop.src = 'assets/workshop-shelf.png';
+      }
+    } catch (e) {
+      workshopBackdrop = null;
+    }
+
     function getThemeBackgroundCanvas(w, h) {
       const theme = activeThemeId || 'zen_amber';
       const targetW = Math.max(1, Math.round(w * dpr));
@@ -4500,7 +4532,26 @@ const __outerGlobalRef = (typeof globalThis !== 'undefined' && globalThis) ? glo
 
       const deskY = h * 0.65;
 
-      if (theme === 'zen_amber') {
+      if (theme === 'zen_amber' && workshopBackdropReady && workshopBackdrop) {
+        const imgW = workshopBackdrop.width || workshopBackdrop.naturalWidth;
+        const imgH = workshopBackdrop.height || workshopBackdrop.naturalHeight;
+        if (imgW > 0 && imgH > 0) {
+          const scale = Math.max(w / imgW, h / imgH);
+          const cropW = w / scale;
+          const cropH = h / scale;
+          const sx = (imgW - cropW) * 0.5;
+          const sy = (imgH - cropH) * 0.5;
+          bCtx.drawImage(workshopBackdrop, sx, sy, cropW, cropH, 0, 0, w, h);
+          // 轻微暖调统一场景色，不压暗背景插画的窗景与木纹细节。
+          bCtx.fillStyle = 'rgba(67, 35, 12, 0.055)';
+          bCtx.fillRect(0, 0, w, h);
+          const headerShade = bCtx.createLinearGradient(0, 0, 0, h * 0.22);
+          headerShade.addColorStop(0, 'rgba(40, 20, 8, 0.22)');
+          headerShade.addColorStop(1, 'rgba(40, 20, 8, 0)');
+          bCtx.fillStyle = headerShade;
+          bCtx.fillRect(0, 0, w, h * 0.22);
+        }
+      } else if (theme === 'zen_amber') {
         // 1. 秘药工坊主渐变
         const base = bCtx.createLinearGradient(0, 0, w * 0.9, h);
         base.addColorStop(0, '#b59756');
@@ -4723,54 +4774,46 @@ const __outerGlobalRef = (typeof globalThis !== 'undefined' && globalThis) ? glo
       c.scale(S / 100, S / 100);
 
       const isRules = (btnId === 'rules-help-btn');
-      const isHint = (btnId === 'hint-btn');
-      const bodyP = new Path2D(isRules
-        ? 'M 50,5 C 83,5 95,17 95,50 C 95,83 83,95 50,95 C 17,95 5,83 5,50 C 5,17 17,5 50,5 Z'
-        : 'M 50,5 C 84,5 95,16 95,50 C 95,84 84,95 50,95 C 16,95 5,84 5,50 C 5,16 16,5 50,5 Z');
+      const bodyP = new Path2D('M 23,4 C 11,4 4,12 4,24 L 4,76 C 4,89 11,96 24,96 L 76,96 C 89,96 96,89 96,76 L 96,24 C 96,12 89,4 77,4 Z');
 
       // (1) 底部柔和暖棕投影 + 主体通透暖珀/冷绿折射玻璃渐变
       c.save();
-      c.shadowColor = isRules ? 'rgba(60, 76, 52, 0.34)' : 'rgba(110, 68, 20, 0.34)';
-      c.shadowBlur = 9;
-      c.shadowOffsetY = 5;
-      const baseG = c.createLinearGradient(15, 5, 85, 95);
-      if (isRules) {
-        baseG.addColorStop(0, 'rgba(228, 239, 226, 0.48)');
-        baseG.addColorStop(0.45, 'rgba(156, 178, 152, 0.30)');
-        baseG.addColorStop(0.82, 'rgba(107, 131, 104, 0.40)');
-        baseG.addColorStop(1, 'rgba(141, 163, 135, 0.50)');
-      } else if (isHint) {
-        baseG.addColorStop(0, 'rgba(237, 226, 190, 0.46)');
-        baseG.addColorStop(0.45, 'rgba(182, 159, 98, 0.30)');
-        baseG.addColorStop(0.80, 'rgba(135, 123, 72, 0.40)');
-        baseG.addColorStop(1, 'rgba(168, 153, 92, 0.48)');
-      } else {
-        baseG.addColorStop(0, 'rgba(247, 223, 184, 0.48)');
-        baseG.addColorStop(0.38, 'rgba(223, 173, 100, 0.28)');
-        baseG.addColorStop(0.72, 'rgba(184, 123, 49, 0.40)');
-        baseG.addColorStop(1, 'rgba(216, 157, 78, 0.50)');
-      }
+      c.shadowColor = 'rgba(45, 22, 8, 0.48)';
+      c.shadowBlur = 8;
+      c.shadowOffsetY = 6;
+      const baseG = c.createLinearGradient(18, 4, 82, 96);
+      baseG.addColorStop(0, '#e4ad61');
+      baseG.addColorStop(0.28, '#c8863f');
+      baseG.addColorStop(0.62, '#a35f2c');
+      baseG.addColorStop(1, '#713d1d');
       c.fillStyle = baseG;
       c.fill(bodyP);
       c.restore();
 
-      // (2) 内部下沿暖色暗部折射
-      if (!isRules && !isHint) {
-        const botShade = c.createRadialGradient(52, 68, 2, 52, 68, 48);
-        botShade.addColorStop(0, 'rgba(138, 82, 22, 0.26)');
-        botShade.addColorStop(0.65, 'rgba(156, 98, 34, 0.12)');
-        botShade.addColorStop(1, 'rgba(156, 98, 34, 0)');
-        c.fillStyle = botShade;
-        c.fill(bodyP);
-      }
+      // (2) 木纹与面板内阴影：让按钮更像工坊里打磨过的实木铭牌。
+      c.save();
+      c.clip(bodyP);
+      c.fillStyle = 'rgba(47, 23, 9, 0.20)';
+      c.fillRect(4, 84, 92, 12);
+      c.strokeStyle = 'rgba(255, 225, 166, 0.18)';
+      c.lineWidth = 1.5;
+      [[18, 30, 79, 27], [12, 54, 87, 57], [19, 77, 80, 73]].forEach(([x1, y1, x2, y2]) => {
+        c.beginPath(); c.moveTo(x1, y1); c.quadraticCurveTo(50, (y1 + y2) * 0.5 + 3, x2, y2); c.stroke();
+      });
+      c.strokeStyle = 'rgba(75, 37, 14, 0.24)';
+      c.lineWidth = 1;
+      [[16, 34, 84, 31], [17, 61, 82, 64]].forEach(([x1, y1, x2, y2]) => {
+        c.beginPath(); c.moveTo(x1, y1); c.quadraticCurveTo(50, (y1 + y2) * 0.5 - 2, x2, y2); c.stroke();
+      });
+      c.restore();
 
       // (3) 顶部斜向新月高光带 (topCrescentSheen)
       const sheenP = new Path2D(isRules
         ? 'M 50,7 C 78,7 89,16 91,38 C 74,47 36,38 9,42 C 11,17 22,7 50,7 Z'
         : 'M 50,7 C 80,7 91,16 92,43 C 70,50 34,39 8,46 C 9,17 20,7 50,7 Z');
       const sheenG = c.createLinearGradient(30, 7, 65, 48);
-      sheenG.addColorStop(0, 'rgba(255, 255, 255, 0.64)');
-      sheenG.addColorStop(0.45, 'rgba(255, 246, 228, 0.30)');
+      sheenG.addColorStop(0, 'rgba(255, 246, 220, 0.35)');
+      sheenG.addColorStop(0.45, 'rgba(255, 232, 187, 0.12)');
       sheenG.addColorStop(1, 'rgba(255, 255, 255, 0)');
       c.fillStyle = sheenG;
       c.fill(sheenP);
@@ -4778,25 +4821,26 @@ const __outerGlobalRef = (typeof globalThis !== 'undefined' && globalThis) ? glo
       // (4) 左上与底部弧形镜面高光弦线（仅 stroke，绝不 fill 变黑！）
       c.save();
       c.lineCap = 'round';
-      c.strokeStyle = 'rgba(255, 255, 255, 0.64)';
-      c.lineWidth = 2.2;
-      c.stroke(new Path2D('M 14,34 C 16,16 27,9.5 50,9.5 C 68,9.5 79,13.5 84,24'));
-      if (!isRules) {
-        c.strokeStyle = 'rgba(255, 243, 214, 0.48)';
-        c.lineWidth = 1.8;
-        c.stroke(new Path2D('M 20,86 C 30,90.5 68,90.5 80,85'));
-      }
+      c.strokeStyle = 'rgba(255, 236, 192, 0.52)';
+      c.lineWidth = 1.4;
+      c.stroke(new Path2D('M 13,28 C 14,13 25,8 39,8 H 74 C 86,8 92,16 92,28'));
+      c.strokeStyle = 'rgba(255, 216, 137, 0.42)';
+      c.lineWidth = 1.1;
+      c.stroke(new Path2D('M 12,79 C 12,89 20,92 29,92 H 75 C 85,92 91,87 91,77'));
       c.restore();
 
       // (5) 外圈玻璃高光描边 (glassRimStroke)
       const rimG = c.createLinearGradient(0, 0, 100, 100);
-      rimG.addColorStop(0, 'rgba(255, 255, 255, 0.95)');
-      rimG.addColorStop(0.30, 'rgba(255, 248, 235, 0.72)');
-      rimG.addColorStop(0.65, 'rgba(255, 231, 194, 0.42)');
-      rimG.addColorStop(1, 'rgba(255, 255, 255, 0.88)');
+      rimG.addColorStop(0, '#ffe2a2');
+      rimG.addColorStop(0.30, '#d99a48');
+      rimG.addColorStop(0.65, '#8b4b20');
+      rimG.addColorStop(1, '#f0c16d');
       c.strokeStyle = rimG;
-      c.lineWidth = 2.5;
+      c.lineWidth = 3.5;
       c.stroke(bodyP);
+      c.strokeStyle = 'rgba(255, 238, 196, 0.72)';
+      c.lineWidth = 0.9;
+      c.stroke(new Path2D('M 24,7 H 76 C 86,7 93,14 93,24 V 75'));
 
       // (6) 绘制按钮中心高精 3D 图标
       c.save();
@@ -5064,39 +5108,39 @@ const __outerGlobalRef = (typeof globalThis !== 'undefined' && globalThis) ? glo
         c.beginPath(); c.ellipse(52, 117.5, 40, 4, 0, 0, Math.PI * 2);
         c.fillStyle = 'rgba(0,0,0,0.32)'; c.fill();
 
-        // 2. 后排提绳
-        strokeRopeCurve(38, 26, 38, 3, 70, 3, 70, 26, '#9ea7b8', 3.4);
+        // 锁定袋沿用工坊的牛皮纸袋形态，用棕金缝边区分状态，避免突兀的银灰占位感。
+        strokeRopeCurve(38, 26, 38, 3, 70, 3, 70, 26, '#8f5d2c', 3.8);
+        strokeRopeCurve(38, 26, 38, 3, 70, 3, 70, 26, '#f6dfb2', 2.1);
 
-        // 3. 锁定袋 3D 银灰袋体与侧面折角
-        fillPoly([14, 27, 78, 27, 92, 20, 28, 20], '#525a6b', '#aeb7c6', 0.6);
-        fillPoly([14, 27, 78, 27, 78, 118, 14, 113], '#d5dce6', 'rgba(120,132,150,0.35)', 0.6);
-        fillPoly([78, 27, 92, 20, 92, 109, 78, 118], '#a5aeba');
-        fillPoly([85, 23.5, 92, 20, 92, 109, 85, 113.5], '#919aa8');
-        fillPoly([14, 96, 78, 100, 78, 118, 14, 113], '#8b94a3');
-        fillPoly([78, 100, 92, 92, 92, 109, 78, 118], '#6d7585');
+        fillPoly([14, 27, 78, 27, 92, 20, 28, 20], '#9b6735', '#e7c482', 0.8);
+        const lockedPaper = c.createLinearGradient(14, 27, 78, 118);
+        lockedPaper.addColorStop(0, '#fff4dd');
+        lockedPaper.addColorStop(0.66, '#f2dfbd');
+        lockedPaper.addColorStop(1, '#dfc191');
+        fillPoly([14, 27, 78, 27, 78, 118, 14, 113], lockedPaper, 'rgba(128,78,32,0.28)', 0.7);
+        fillPoly([78, 27, 92, 20, 92, 109, 78, 118], '#c69b60');
+        fillPoly([85, 23.5, 92, 20, 92, 109, 85, 113.5], '#a97943');
+        fillPoly([14, 96, 78, 100, 78, 118, 14, 113], '#a87942');
+        fillPoly([78, 100, 92, 92, 92, 109, 78, 118], '#79532d');
 
         // 4. 穿绳金属鸡眼扣与前排提绳
         [29, 63].forEach(cx => {
           c.beginPath(); c.arc(cx, 34, 3.4, 0, Math.PI * 2);
-          c.fillStyle = '#e6ebf2'; c.fill();
-          c.strokeStyle = '#7a8494'; c.lineWidth = 1.2; c.stroke();
+          c.fillStyle = '#f8e7c3'; c.fill();
+          c.strokeStyle = '#a4753d'; c.lineWidth = 1.2; c.stroke();
         });
-        strokeRopeCurve(29, 34, 29, 2, 63, 2, 63, 34, '#f5f8fc', 3.2);
+        strokeRopeCurve(29, 34, 29, 2, 63, 2, 63, 34, '#f7e4bd', 3.2);
 
-        // 5. 展示窗与中央 3D 摄像机图标
+        // 5. 暖金展示窗与圆形广告入口徽章
         c.beginPath(); c.roundRect(24, 42, 44, 55, 6);
-        c.fillStyle = '#7c8594'; c.fill();
+        c.fillStyle = '#b18043'; c.fill();
         c.beginPath(); c.roundRect(27.2, 45.2, 37.6, 49.5, 4.2);
-        c.fillStyle = '#9ea7b5'; c.fill();
-
-        c.save();
-        c.translate(33, 60);
-        c.beginPath(); c.roundRect(0, 0, 24, 19, 5);
-        c.fillStyle = '#ffffff'; c.fill();
-        c.strokeStyle = '#64748b'; c.lineWidth = 1; c.stroke();
-        fillPoly([23, 6, 33, 1, 33, 18, 23, 13], '#ffffff', '#64748b', 1);
-        fillPoly([9, 5, 9, 14, 17, 9.5], '#43586e');
-        c.restore();
+        c.fillStyle = 'rgba(255,247,226,0.82)'; c.fill();
+        c.strokeStyle = 'rgba(131,82,36,0.36)'; c.lineWidth = 0.7; c.stroke();
+        c.beginPath(); c.arc(46, 69, 12, 0, Math.PI * 2);
+        c.fillStyle = '#a46d34'; c.fill();
+        c.strokeStyle = '#f5d99f'; c.lineWidth = 1.4; c.stroke();
+        fillPoly([43, 63.5, 43, 74.5, 51, 69], '#fff2d3');
       } else {
         const col = COLORS[bag.color] || COLORS.green;
         const packedCol = bag.packedBottle ? (COLORS[bag.packedBottle] || col) : null;
@@ -5105,35 +5149,36 @@ const __outerGlobalRef = (typeof globalThis !== 'undefined' && globalThis) ? glo
         c.beginPath(); c.ellipse(52, 117.5, 41, 4.2, 0, 0, Math.PI * 2);
         c.fillStyle = 'rgba(0, 0, 0, 0.35)'; c.fill();
 
-        // 2. 后排双层立体提手绳
-        strokeRopeCurve(38, 26, 38, 3, 70, 3, 70, 26, '#b5bfd0', 4.2);
-        strokeRopeCurve(38, 26, 38, 3, 70, 3, 70, 26, '#eef3fa', 2.2);
+        // 2. 后排双层麻绳提手
+        strokeRopeCurve(38, 26, 38, 3, 70, 3, 70, 26, '#8c5b2d', 4.2);
+        strokeRopeCurve(38, 26, 38, 3, 70, 3, 70, 26, '#f6dfb4', 2.2);
 
-        // 3. 袋口深灰内腔
-        fillPoly([14, 27, 78, 27, 92, 20, 28, 20], '#7c8596', '#cdd5e2', 0.6);
-        fillPoly([17, 26.5, 76, 26.5, 88, 21, 29, 21], '#525b6c');
+        // 3. 袋口深棕内腔
+        fillPoly([14, 27, 78, 27, 92, 20, 28, 20], '#9b6735', '#e7c482', 0.7);
+        fillPoly([17, 26.5, 76, 26.5, 88, 21, 29, 21], '#754923');
 
-        // 4. 3D 象牙白高定礼袋主袋体（正面 + 右侧立体风琴折面 + 内折痕线）
+        // 4. 3D 牛皮纸礼袋主袋体（奶油纸面 + 蜂蜜木侧面）
         const frontGrad = c.createLinearGradient(14, 27, 78, 118);
-        frontGrad.addColorStop(0, '#ffffff');
-        frontGrad.addColorStop(0.7, '#f8fafc');
-        frontGrad.addColorStop(1, '#eef2f7');
-        fillPoly([14, 27, 78, 27, 78, 118, 14, 113], frontGrad, 'rgba(148, 163, 184, 0.38)', 0.6);
-        fillPoly([78, 27, 92, 20, 92, 109, 78, 118], '#d9dde4');
-        fillPoly([85, 23.5, 92, 20, 92, 109, 85, 113.5], '#b4bcc8');
+        frontGrad.addColorStop(0, '#fff5df');
+        frontGrad.addColorStop(0.58, '#f4e1bf');
+        frontGrad.addColorStop(1, '#dfc18f');
+        fillPoly([14, 27, 78, 27, 78, 118, 14, 113], frontGrad, 'rgba(128, 78, 32, 0.30)', 0.7);
+        fillPoly([78, 27, 92, 20, 92, 109, 78, 118], '#c69b60');
+        fillPoly([85, 23.5, 92, 20, 92, 109, 85, 113.5], '#a97943');
         c.beginPath();
         c.moveTo(85, 23.5);
         c.lineTo(85, 101);
-        c.strokeStyle = '#969fab';
+        c.strokeStyle = 'rgba(95, 59, 27, 0.46)';
         c.lineWidth = 1.0;
         c.stroke();
 
-        // 5. 主题色展示窗外框与内嵌透明视窗
+        // 5. 牛皮纸镶边展示窗；主题色集中在底部色带，不再给每只袋子套一圈荧光色。
         c.beginPath(); c.roundRect(23.5, 41.5, 45, 56.5, 6.5);
-        c.fillStyle = col.bagMain; c.fill();
+        c.fillStyle = '#b78445'; c.fill();
         c.beginPath(); c.roundRect(27.2, 45.2, 37.6, 49.5, 4.2);
-        c.fillStyle = '#ccd3de'; c.fill();
-        fillPoly([54.5, 45.2, 64.8, 45.2, 64.8, 94.7, 54.5, 94.7], 'rgba(115, 125, 142, 0.35)');
+        c.fillStyle = 'rgba(255, 247, 226, 0.82)'; c.fill();
+        c.strokeStyle = 'rgba(131, 82, 36, 0.38)'; c.lineWidth = 0.7; c.stroke();
+        fillPoly([54.5, 45.2, 64.8, 45.2, 64.8, 94.7, 54.5, 94.7], 'rgba(178, 133, 71, 0.14)');
 
         // 6. 若已装入满瓶，在透明橱窗内绘制精致 3D 微缩封塞水瓶
         if (packedCol) {
@@ -5186,6 +5231,14 @@ const __outerGlobalRef = (typeof globalThis !== 'undefined' && globalThis) ? glo
           c.restore();
         }
 
+        // 空袋使用和参考稿一致的圆形播放徽章，填充后的袋子则显示袋内药水瓶。
+        if (!packedCol) {
+          c.beginPath(); c.arc(46, 70, 12, 0, Math.PI * 2);
+          c.fillStyle = '#a46d34'; c.fill();
+          c.strokeStyle = '#f5d99f'; c.lineWidth = 1.4; c.stroke();
+          fillPoly([43, 64.5, 43, 75.5, 51, 70], '#fff2d3');
+        }
+
         // 7. 橱窗玻璃斜向高光反光面
         fillPoly([27.2, 45.2, 47.5, 45.2, 27.2, 84.5], 'rgba(255, 255, 255, 0.38)');
 
@@ -5197,19 +5250,19 @@ const __outerGlobalRef = (typeof globalThis !== 'undefined' && globalThis) ? glo
         // 9. 左右双层金属穿绳鸡眼环
         [29, 63].forEach(cx => {
           c.beginPath(); c.arc(cx, 34.5, 3.6, 0, Math.PI * 2);
-          c.fillStyle = '#eef2f8'; c.fill();
-          c.strokeStyle = '#aeb7c6'; c.lineWidth = 1.2; c.stroke();
+          c.fillStyle = '#f8e7c3'; c.fill();
+          c.strokeStyle = '#a4753d'; c.lineWidth = 1.2; c.stroke();
           c.beginPath(); c.arc(cx, 34.5, 1.8, 0, Math.PI * 2);
-          c.fillStyle = '#485264'; c.fill();
+          c.fillStyle = '#6e4725'; c.fill();
         });
 
         // 10. 前排 3 层立体编织提手绳（投影层 + 灰白绳体 + 顶部高光芯）
         c.save();
         c.translate(0, 1.5);
-        strokeRopeCurve(29, 34.5, 29, 2, 63, 2, 63, 34.5, 'rgba(90, 105, 130, 0.32)', 5.2);
+        strokeRopeCurve(29, 34.5, 29, 2, 63, 2, 63, 34.5, 'rgba(94, 57, 26, 0.30)', 5.2);
         c.restore();
-        strokeRopeCurve(29, 34.5, 29, 2, 63, 2, 63, 34.5, '#d5dde9', 4.4);
-        strokeRopeCurve(29, 34.5, 29, 2, 63, 2, 63, 34.5, '#ffffff', 2.6);
+        strokeRopeCurve(29, 34.5, 29, 2, 63, 2, 63, 34.5, '#b98448', 4.4);
+        strokeRopeCurve(29, 34.5, 29, 2, 63, 2, 63, 34.5, '#fff0cc', 2.6);
       }
       c.restore();
       nativeBagCache.set(key, off);
@@ -7349,44 +7402,47 @@ const __outerGlobalRef = (typeof globalThis !== 'undefined' && globalThis) ? glo
       coralSquare: { top: '#df8558', mid: '#c96c40', bot: '#b65530', shadowCol: 'rgba(92, 42, 14, 0.32)', textShadow: 'rgba(85, 34, 10, 0.44)' }
     };
 
-    // 图2同款：顶部 3D 庆典折带彩旗 + 缤纷气球 + 立体金星标题横幅绘制器
+    // 木牌式弹窗标题：与工坊货架、瓶塞和木质底栏统一。
     function drawFig2RibbonHeader(ctx, cx, topY, bannerW, bannerH, titleTxt) {
       ctx.save();
       ctx.translate(cx - bannerW * 0.5, topY);
       ctx.scale(bannerW / 360, bannerH / 115);
-
-      // 1. 缤纷庆典气球
-      [[84, 48, 15, '#38bdf8'], [110, 36, 22, '#e879f9'], [242, 34, 21, '#60a5fa'], [272, 44, 24, '#fb7185']].forEach(([bx, by, br, bc]) => {
-        ctx.beginPath(); ctx.arc(bx, by, br, 0, Math.PI * 2);
-        ctx.fillStyle = bc; ctx.fill();
-        ctx.beginPath(); ctx.arc(bx - br * 0.3, by - br * 0.3, br * 0.26, 0, Math.PI * 2);
-        ctx.fillStyle = 'rgba(255,255,255,0.45)'; ctx.fill();
+      // 木牌厚边与深色底唇
+      const plank = new Path2D('M 39,20 Q 28,20 27,31 L 31,82 Q 32,94 45,94 L 315,94 Q 328,94 329,82 L 333,31 Q 332,20 321,20 Z');
+      ctx.save(); ctx.translate(0, 5); ctx.fillStyle = 'rgba(48, 23, 8, 0.36)'; ctx.fill(plank); ctx.restore();
+      const wood = ctx.createLinearGradient(0, 18, 0, 96);
+      wood.addColorStop(0, '#d09a57'); wood.addColorStop(0.20, '#ae7139');
+      wood.addColorStop(0.58, '#875025'); wood.addColorStop(1, '#67391a');
+      ctx.fillStyle = wood; ctx.fill(plank);
+      ctx.strokeStyle = '#e7bd78'; ctx.lineWidth = 3; ctx.stroke(plank);
+      ctx.strokeStyle = 'rgba(255, 233, 190, 0.66)'; ctx.lineWidth = 1;
+      ctx.stroke(new Path2D('M 39,25 Q 34,25 35,34 L 39,78 Q 40,87 48,87 H 312 Q 320,87 321,78 L 325,34 Q 326,25 319,25 Z'));
+      // 克制的木纹线，压在字后仍保持清晰。
+      ctx.save(); ctx.clip(plank);
+      ctx.strokeStyle = 'rgba(255, 220, 161, 0.20)'; ctx.lineWidth = 1.2;
+      [[49, 39, 311, 37], [39, 70, 320, 72], [61, 83, 300, 82]].forEach(([x1, y1, x2, y2]) => {
+        ctx.beginPath(); ctx.moveTo(x1, y1); ctx.quadraticCurveTo(180, (y1 + y2) * 0.5 + 4, x2, y2); ctx.stroke();
       });
-      // 2. 顶部双金星
-      drawStar5(ctx, 142, 34, 18, 7.5, '#fde047', '#d97706', 2.2);
-      drawStar5(ctx, 194, 24, 29, 12, '#fde047', '#d97706', 2.8);
+      ctx.restore();
+      // 两端嫩叶呼应参考稿，避免整块木牌显得厚重。
+      const leaf = (x, y, rot, color) => {
+        ctx.save(); ctx.translate(x, y); ctx.rotate(rot);
+        ctx.beginPath(); ctx.ellipse(0, 0, 15, 6.5, 0, 0, Math.PI * 2);
+        ctx.fillStyle = color; ctx.fill(); ctx.strokeStyle = 'rgba(53, 91, 25, 0.72)'; ctx.lineWidth = 1.2; ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(-10, 0); ctx.lineTo(10, 0); ctx.strokeStyle = 'rgba(237, 255, 178, 0.68)'; ctx.lineWidth = 0.9; ctx.stroke();
+        ctx.restore();
+      };
+      leaf(35, 26, -0.55, '#78b84b'); leaf(48, 17, -0.18, '#9bcf5d'); leaf(325, 26, 0.55, '#78b84b'); leaf(312, 17, 0.18, '#9bcf5d');
+      ctx.fillStyle = '#f0c47d';
+      [[42, 57], [318, 57]].forEach(([x, y]) => { ctx.beginPath(); ctx.arc(x, y, 2.3, 0, Math.PI * 2); ctx.fill(); });
 
-      // 3. 左右两侧立体折带尾翼
-      ctx.fillStyle = '#d97706'; ctx.strokeStyle = '#92400e'; ctx.lineWidth = 2.2;
-      const wL = new Path2D('M 22,68 L 78,60 L 78,96 L 22,102 L 38,85 Z');
-      const wR = new Path2D('M 338,68 L 282,60 L 282,96 L 338,102 L 322,85 Z');
-      ctx.fill(wL); ctx.stroke(wL);
-      ctx.fill(wR); ctx.stroke(wR);
-
-      // 4. 中央拱形暖橙流金主横幅
-      const ribG = ctx.createLinearGradient(0, 38, 0, 96);
-      ribG.addColorStop(0, '#ffd27d'); ribG.addColorStop(0.4, '#f89c3e'); ribG.addColorStop(1, '#e0741e');
-      const mainRib = new Path2D('M 56,56 C 110,36 250,36 304,56 L 294,94 C 242,74 118,74 66,94 Z');
-      ctx.fillStyle = ribG; ctx.fill(mainRib);
-      ctx.strokeStyle = '#b45309'; ctx.lineWidth = 2.8; ctx.stroke(mainRib);
-
-      // 5. 标题白字 + 深棕描边
+      // 标题字用奶油白与深棕描边，适配木纹背景。
       ctx.font = '900 24px "Fredoka", "PingFang SC", "Microsoft YaHei", sans-serif';
       ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-      ctx.strokeStyle = '#92400e'; ctx.lineWidth = 4.5;
-      ctx.strokeText(titleTxt, 180, 71);
-      ctx.fillStyle = '#ffffff';
-      ctx.fillText(titleTxt, 180, 71);
+      ctx.strokeStyle = '#5f3318'; ctx.lineWidth = 5;
+      ctx.strokeText(titleTxt, 180, 58);
+      ctx.fillStyle = '#fff0d1';
+      ctx.fillText(titleTxt, 180, 57);
       ctx.restore();
     }
 
@@ -8515,19 +8571,37 @@ const __outerGlobalRef = (typeof globalThis !== 'undefined' && globalThis) ? glo
         const r = layoutCache.centerLvTrigger;
         const cx = r.left + r.width * 0.5;
         const cy = r.top + 12;
+        // 主关卡标题改为工坊木牌，保留可点击热区与原有关卡跳转。
+        const plaque = makeRect(cx - 100, cy - 17, 200, 34);
         ctx.save();
-        ctx.font = `900 ${Math.min(29, Math.max(23, Math.round(viewH * 0.035)))}px "PingFang SC", "Microsoft YaHei", "Fredoka", sans-serif`;
+        ctx.beginPath(); ctx.roundRect(plaque.left, plaque.top + 2, plaque.width, plaque.height, 13);
+        ctx.fillStyle = 'rgba(42, 20, 7, 0.44)'; ctx.fill();
+        ctx.beginPath(); ctx.roundRect(plaque.left, plaque.top, plaque.width, plaque.height, 13);
+        const wood = ctx.createLinearGradient(0, plaque.top, 0, plaque.bottom);
+        wood.addColorStop(0, '#bd7c3d'); wood.addColorStop(0.22, '#a76430');
+        wood.addColorStop(0.72, '#85481f'); wood.addColorStop(1, '#693719');
+        ctx.fillStyle = wood; ctx.fill();
+        ctx.strokeStyle = '#e8bd70'; ctx.lineWidth = 2; ctx.stroke();
+        ctx.beginPath(); ctx.roundRect(plaque.left + 3, plaque.top + 3, plaque.width - 6, plaque.height - 6, 10);
+        ctx.strokeStyle = 'rgba(255, 225, 162, 0.38)'; ctx.lineWidth = 0.8; ctx.stroke();
+        ctx.strokeStyle = 'rgba(255, 219, 159, 0.15)'; ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.moveTo(plaque.left + 18, plaque.top + 10); ctx.quadraticCurveTo(cx, plaque.top + 7, plaque.right - 18, plaque.top + 10); ctx.stroke();
+        ctx.restore();
+        ctx.save();
+        ctx.font = `900 ${Math.min(25, Math.max(20, Math.round(viewH * 0.029)))}px "PingFang SC", "Microsoft YaHei", "Fredoka", sans-serif`;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
-        ctx.fillStyle = 'rgba(98, 56, 10, 0.42)';
-        ctx.fillText(`第 ${currentLevelId} 关`, cx, cy + 2.5);
-        ctx.fillStyle = '#ffffff';
+        ctx.lineWidth = 3;
+        ctx.strokeStyle = 'rgba(67, 34, 14, 0.82)';
+        ctx.strokeText(`第 ${currentLevelId} 关`, cx, cy + 0.5);
+        ctx.fillStyle = '#fff4dc';
         ctx.fillText(`第 ${currentLevelId} 关`, cx, cy);
 
         let goalTxt = '';
         let goalIconType = 'bottle';
         const targetTotal = Math.max(1, levelTargetTotalBottles || 4);
         const catB = bottles.find(b => b && !b.removed && b.isGiantCat);
+        const corkedNow = bottles.filter(b => b && b.corked).length;
         if (catB) {
           goalIconType = 'cat';
           goalTxt = `目标：灵猫收集 ${catB.layers.length}/${catB.maxCap || 8}`;
@@ -8536,7 +8610,6 @@ const __outerGlobalRef = (typeof globalThis !== 'undefined' && globalThis) ? glo
           goalTxt = `目标：礼袋打包 ${Math.min(packedTotal, targetTotal)}/${targetTotal}`;
         } else {
           goalIconType = 'bottle';
-          const corkedNow = bottles.filter(b => b && b.corked).length;
           goalTxt = `目标：同色封存 ${Math.min(corkedNow, targetTotal)}/${targetTotal} 瓶`;
         }
         if (remainingMoves !== null) {
@@ -8550,13 +8623,26 @@ const __outerGlobalRef = (typeof globalThis !== 'undefined' && globalThis) ? glo
         const gy = cy + 29;
         const pillLeft = cx - gw * 0.5;
 
-        ctx.beginPath();
-        ctx.roundRect(pillLeft, gy - gh * 0.5, gw, gh, gh * 0.5);
-        ctx.fillStyle = (remainingMoves !== null && remainingMoves <= 5) ? 'rgba(220, 38, 38, 0.88)' : 'rgba(88, 50, 10, 0.48)';
-        ctx.fill();
-        ctx.strokeStyle = 'rgba(255, 248, 220, 0.82)';
-        ctx.lineWidth = 1.3;
-        ctx.stroke();
+        const progRect = makeRect(pillLeft, gy - gh * 0.5, gw, gh);
+        ctx.beginPath(); ctx.roundRect(progRect.left - 2, progRect.top - 2, progRect.width + 4, progRect.height + 4, gh * 0.5);
+        const trackWood = ctx.createLinearGradient(0, progRect.top - 2, 0, progRect.bottom + 2);
+        trackWood.addColorStop(0, '#d69a50'); trackWood.addColorStop(0.5, '#9b5c2a'); trackWood.addColorStop(1, '#693918');
+        ctx.fillStyle = trackWood; ctx.fill();
+        ctx.strokeStyle = '#f3d18b'; ctx.lineWidth = 1.4; ctx.stroke();
+        ctx.save();
+        ctx.beginPath(); ctx.roundRect(progRect.left + 3, progRect.top + 3, progRect.width - 6, progRect.height - 6, (gh - 6) * 0.5); ctx.clip();
+        ctx.fillStyle = (remainingMoves !== null && remainingMoves <= 5) ? '#c84832' : '#5c842c';
+        ctx.fillRect(progRect.left + 3, progRect.top + 3, progRect.width - 6, progRect.height - 6);
+        const ratio = cfg.isCatBossLevel
+          ? Math.min(1, Math.max(0, (catB ? catB.layers.length : 0) / Math.max(1, catB ? catB.maxCap : 8)))
+          : cfg.hasBags
+            ? Math.min(1, Math.max(0, packedTotal / targetTotal))
+            : Math.min(1, Math.max(0, corkedNow / targetTotal));
+        const progressFill = ctx.createLinearGradient(0, progRect.top, 0, progRect.bottom);
+        progressFill.addColorStop(0, 'rgba(147, 199, 70, 0.98)'); progressFill.addColorStop(1, 'rgba(75, 127, 36, 0.98)');
+        ctx.fillStyle = progressFill;
+        ctx.fillRect(progRect.left + 3, progRect.top + 3, (progRect.width - 6) * ratio, progRect.height - 6);
+        ctx.restore();
 
         // 纯矢量绘制精致五角金星图标（彻底告别 Emoji 在微信小游戏真机/模拟器上的乱码豆腐块问题）
         const icX = pillLeft + 15;
@@ -8726,8 +8812,10 @@ const __outerGlobalRef = (typeof globalThis !== 'undefined' && globalThis) ? glo
           vs.aoScale += (targetAoScale - vs.aoScale) * 0.24;
           vs.aoAlpha += (targetAoAlpha - vs.aoAlpha) * 0.24;
 
-          const cCan = getNativeCoasterCanvas(b);
-          ctx.drawImage(cCan, padRect.left, padRect.top, padRect.width, padRect.height);
+          if (activeThemeId !== 'zen_amber') {
+            const cCan = getNativeCoasterCanvas(b);
+            ctx.drawImage(cCan, padRect.left, padRect.top, padRect.width, padRect.height);
+          }
 
           const aoCx = padRect.left + padRect.width * 0.50;
           const aoCy = padRect.top + padRect.height * (18.5 / 46.0);
